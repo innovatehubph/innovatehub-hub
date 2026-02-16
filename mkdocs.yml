@@ -1,0 +1,93 @@
+site_name: InnovateHub Business Hub
+site_description: Comprehensive documentation for the InnovateHub Business Hub — a full-stack Facebook Business Management Platform with AI-powered development.
+site_author: InnovateHub PH
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - content.tabs.link
+    - search.suggest
+    - search.highlight
+  icon:
+    repo: fontawesome/brands/github
+
+repo_url: https://github.com/innovatehubph/innovatehub-hub
+repo_name: innovatehubph/innovatehub-hub
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Overview: getting-started/overview.md
+    - Architecture: getting-started/architecture.md
+    - Installation: getting-started/installation.md
+    - Configuration: getting-started/configuration.md
+  - Dashboard Guide:
+    - Dashboard Home: dashboard/home.md
+    - Business Management: dashboard/businesses.md
+    - Messenger & Conversations: dashboard/messenger.md
+    - Bot Flows: dashboard/bot-flows.md
+    - Page Management: dashboard/pages.md
+    - Ads & Campaigns: dashboard/campaigns.md
+    - Products & Orders: dashboard/products.md
+    - Token Store: dashboard/tokens.md
+    - Webhook Logs: dashboard/webhooks.md
+    - Users & Roles: dashboard/users.md
+    - Facebook Setup: dashboard/facebook-setup.md
+    - Settings: dashboard/settings.md
+  - AI Workshop:
+    - Overview: ai-workshop/overview.md
+    - Code Generation: ai-workshop/code-generation.md
+    - Staging Pipeline: ai-workshop/staging-pipeline.md
+    - Templates: ai-workshop/templates.md
+  - Cloud Code:
+    - Cloud Functions: cloud-code/functions.md
+    - Background Jobs: cloud-code/jobs.md
+    - Triggers: cloud-code/triggers.md
+    - Webhook Handlers: cloud-code/webhooks.md
+  - API Reference:
+    - REST Endpoints: api/rest-endpoints.md
+    - AI Proxy: api/ai-proxy.md
+    - Data Schemas: api/schemas.md
+  - Testing:
+    - E2E Test Suite: testing/e2e-tests.md
+    - Test Results: testing/results.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/innovatehubph

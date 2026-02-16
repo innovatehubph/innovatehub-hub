@@ -45,7 +45,7 @@ export default function Dashboard({ businessId }: DashboardProps) {
         logQuery.descending('createdAt');
         logQuery.limit(5);
         const logs = await logQuery.find({ useMasterKey: true });
-        setRecentLogs(logs.map(l => l.toJSON()));
+        setRecentLogs(logs.map((l: any) => l.toJSON()));
       } catch (err) {
         console.error('Failed to fetch stats:', err);
       } finally {

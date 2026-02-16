@@ -1,0 +1,592 @@
+{
+  "url": "http://localhost:3457",
+  "timestamp": "2026-02-16T06:50:23.807Z",
+  "summary": {
+    "passed": 49,
+    "failed": 4,
+    "total": 53,
+    "passRate": "92.5%"
+  },
+  "tests": [
+    {
+      "test": "Page loads without blank screen",
+      "passed": true,
+      "details": "Title: \"InnovateHub Business Hub\"",
+      "screenshots": [
+        {
+          "filename": "01-initial-load.png",
+          "description": "Dashboard initial load — landing page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:21.159Z"
+    },
+    {
+      "test": "Page has rendered content",
+      "passed": true,
+      "details": "Body text length: 513",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:49:21.176Z"
+    },
+    {
+      "test": "No React error boundary triggered",
+      "passed": true,
+      "details": "",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:49:21.178Z"
+    },
+    {
+      "test": "No critical console errors on load",
+      "passed": true,
+      "details": "",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:49:22.179Z"
+    },
+    {
+      "test": "Navigate to Dashboard",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "02-nav-dashboard.png",
+          "description": "Dashboard page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:23.747Z"
+    },
+    {
+      "test": "Navigate to Businesses",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "03-nav-businesses.png",
+          "description": "Businesses page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:25.314Z"
+    },
+    {
+      "test": "Navigate to Messenger",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "04-nav-messenger.png",
+          "description": "Messenger page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:26.877Z"
+    },
+    {
+      "test": "Navigate to Bot Flows",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "05-nav-bot-flows.png",
+          "description": "Bot Flows page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:28.447Z"
+    },
+    {
+      "test": "Navigate to Page Management",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "06-nav-page-management.png",
+          "description": "Page Management page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:30.018Z"
+    },
+    {
+      "test": "Navigate to Ads & Campaigns",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "07-nav-ads-campaigns.png",
+          "description": "Ads & Campaigns page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:31.575Z"
+    },
+    {
+      "test": "Navigate to Products",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "08-nav-products.png",
+          "description": "Products page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:33.144Z"
+    },
+    {
+      "test": "Navigate to Orders",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "09-nav-orders.png",
+          "description": "Orders page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:34.714Z"
+    },
+    {
+      "test": "Navigate to Token Store",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "10-nav-token-store.png",
+          "description": "Token Store page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:36.274Z"
+    },
+    {
+      "test": "Navigate to Webhook Logs",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "11-nav-webhook-logs.png",
+          "description": "Webhook Logs page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:37.842Z"
+    },
+    {
+      "test": "Navigate to Users & Roles",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "12-nav-users-roles.png",
+          "description": "Users & Roles page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:39.391Z"
+    },
+    {
+      "test": "Navigate to Facebook Setup",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "13-nav-facebook-setup.png",
+          "description": "Facebook Setup page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:40.973Z"
+    },
+    {
+      "test": "Navigate to AI Workshop",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "14-nav-ai-workshop.png",
+          "description": "AI Workshop page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:42.550Z"
+    },
+    {
+      "test": "Navigate to Settings",
+      "passed": true,
+      "details": "Content rendered",
+      "screenshots": [
+        {
+          "filename": "15-nav-settings.png",
+          "description": "Settings page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:44.153Z"
+    },
+    {
+      "test": "Sidebar collapses",
+      "passed": true,
+      "details": "Width: 64px",
+      "screenshots": [
+        {
+          "filename": "16-sidebar-expanded.png",
+          "description": "Sidebar in expanded state"
+        },
+        {
+          "filename": "17-sidebar-collapsed.png",
+          "description": "Sidebar in collapsed state"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:45.815Z"
+    },
+    {
+      "test": "Sidebar expands",
+      "passed": true,
+      "details": "Width: 256px",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:49:46.330Z"
+    },
+    {
+      "test": "Business selector has options",
+      "passed": true,
+      "details": "Options: All Businesses, PlataPay, InnovateHub",
+      "screenshots": [
+        {
+          "filename": "18-business-selector.png",
+          "description": "Business selector dropdown in header"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:47.415Z"
+    },
+    {
+      "test": "Can select a business",
+      "passed": true,
+      "details": "Selected: PlataPay",
+      "screenshots": [
+        {
+          "filename": "19-business-selected.png",
+          "description": "Selected business: PlataPay"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:48.497Z"
+    },
+    {
+      "test": "Dashboard renders stat cards",
+      "passed": true,
+      "details": "Found 29 card-like elements",
+      "screenshots": [
+        {
+          "filename": "20-dashboard-home.png",
+          "description": "Dashboard home with stat cards and data"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:50.592Z"
+    },
+    {
+      "test": "Loading states resolve",
+      "passed": true,
+      "details": "Spinners before: 0, after: 0",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:49:53.745Z"
+    },
+    {
+      "test": "AI Workshop shows 6 templates",
+      "passed": true,
+      "details": "Templates: CRM ContactsCreate a CRM Contacts page that displays a table of customer contacts with name,..., Email CampaignsCreate an Email Campaigns management page with a table showing campaign name, su..., Analytics DashboardCreate an Analytics & Reports page showing business metrics. Include line chart ..., Payment ProcessingCreate a Payment Processing page for PlataPay integration. Show stat cards: tota..., Inventory ManagerCreate an Inventory Management page. Show stat cards: total SKUs, low stock item..., Telegram IntegrationCreate a Telegram Bot Integration page. Show configuration section for: bot toke...",
+      "screenshots": [
+        {
+          "filename": "21-ai-workshop-landing.png",
+          "description": "AI Workshop landing with templates and input"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:55.383Z"
+    },
+    {
+      "test": "AI Workshop has prompt input",
+      "passed": true,
+      "details": "",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:49:55.386Z"
+    },
+    {
+      "test": "Pipeline stages described",
+      "passed": true,
+      "details": "Generate → Stage → QA Review → Deploy",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:49:55.388Z"
+    },
+    {
+      "test": "Can type in prompt field",
+      "passed": true,
+      "details": "",
+      "screenshots": [
+        {
+          "filename": "22-ai-workshop-typed.png",
+          "description": "AI Workshop with user prompt typed"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:56.080Z"
+    },
+    {
+      "test": "Chat widget opens on click",
+      "passed": true,
+      "details": "",
+      "screenshots": [
+        {
+          "filename": "23-chat-widget-closed.png",
+          "description": "Chat widget button visible"
+        },
+        {
+          "filename": "24-chat-widget-open.png",
+          "description": "Chat widget opened"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:58.100Z"
+    },
+    {
+      "test": "Responsive: desktop-1920 (1920x1080)",
+      "passed": true,
+      "details": "Content length: 733",
+      "screenshots": [
+        {
+          "filename": "25-responsive-desktop-1920.png",
+          "description": "Dashboard at 1920x1080"
+        }
+      ],
+      "timestamp": "2026-02-16T06:49:59.688Z"
+    },
+    {
+      "test": "Responsive: laptop-1366 (1366x768)",
+      "passed": true,
+      "details": "Content length: 733",
+      "screenshots": [
+        {
+          "filename": "26-responsive-laptop-1366.png",
+          "description": "Dashboard at 1366x768"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:01.271Z"
+    },
+    {
+      "test": "Responsive: tablet-768 (768x1024)",
+      "passed": true,
+      "details": "Content length: 733",
+      "screenshots": [
+        {
+          "filename": "27-responsive-tablet-768.png",
+          "description": "Dashboard at 768x1024"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:02.856Z"
+    },
+    {
+      "test": "Responsive: mobile-375 (375x812)",
+      "passed": true,
+      "details": "Content length: 733",
+      "screenshots": [
+        {
+          "filename": "28-responsive-mobile-375.png",
+          "description": "Dashboard at 375x812"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:04.407Z"
+    },
+    {
+      "test": "Mobile hamburger menu works",
+      "passed": true,
+      "details": "",
+      "screenshots": [
+        {
+          "filename": "29-mobile-nav-closed.png",
+          "description": "Mobile view — sidebar hidden"
+        },
+        {
+          "filename": "30-mobile-nav-open.png",
+          "description": "Mobile view — sidebar opened via hamburger"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:06.004Z"
+    },
+    {
+      "test": "API /health responds",
+      "passed": true,
+      "details": "Status: ok",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:50:06.018Z"
+    },
+    {
+      "test": "API /agent/status responds",
+      "passed": false,
+      "details": "Files: undefined, Routes: undefined, Staging: none",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:50:06.025Z"
+    },
+    {
+      "test": "API /agent/source returns source tree",
+      "passed": false,
+      "details": "0 files, 0 routes",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:50:06.029Z"
+    },
+    {
+      "test": "DOM Content Loaded",
+      "passed": true,
+      "details": "83ms",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:50:06.034Z"
+    },
+    {
+      "test": "Page Load Complete",
+      "passed": true,
+      "details": "83ms",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:50:06.034Z"
+    },
+    {
+      "test": "First Contentful Paint",
+      "passed": true,
+      "details": "148ms",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:50:06.034Z"
+    },
+    {
+      "test": "Transfer size reasonable",
+      "passed": true,
+      "details": "1KB",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:50:06.034Z"
+    },
+    {
+      "test": "Products page renders",
+      "passed": {
+        "handle": {}
+      },
+      "details": "Table found",
+      "screenshots": [
+        {
+          "filename": "31-data-products.png",
+          "description": "Products page with data table"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:08.121Z"
+    },
+    {
+      "test": "Orders page renders",
+      "passed": {
+        "handle": {}
+      },
+      "details": "Table found",
+      "screenshots": [
+        {
+          "filename": "32-data-orders.png",
+          "description": "Orders page with data table"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:10.197Z"
+    },
+    {
+      "test": "Messenger page renders",
+      "passed": {
+        "handle": {}
+      },
+      "details": "Table found",
+      "screenshots": [
+        {
+          "filename": "33-data-messenger.png",
+          "description": "Messenger page with data table"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:12.261Z"
+    },
+    {
+      "test": "Webhook Logs page renders",
+      "passed": {
+        "handle": {}
+      },
+      "details": "Table found",
+      "screenshots": [
+        {
+          "filename": "34-data-webhook-logs.png",
+          "description": "Webhook Logs page with data table"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:14.328Z"
+    },
+    {
+      "test": "Users & Roles page renders",
+      "passed": {
+        "handle": {}
+      },
+      "details": "Table found",
+      "screenshots": [
+        {
+          "filename": "35-data-users-roles.png",
+          "description": "Users & Roles page with data table"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:16.390Z"
+    },
+    {
+      "test": "Token Store page renders",
+      "passed": {
+        "handle": {}
+      },
+      "details": "Table found",
+      "screenshots": [
+        {
+          "filename": "36-data-token-store.png",
+          "description": "Token Store page with data table"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:18.459Z"
+    },
+    {
+      "test": "Settings page renders",
+      "passed": true,
+      "details": "",
+      "screenshots": [
+        {
+          "filename": "37-settings-page.png",
+          "description": "Settings page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:20.020Z"
+    },
+    {
+      "test": "Facebook Setup page renders",
+      "passed": true,
+      "details": "",
+      "screenshots": [
+        {
+          "filename": "38-facebook-setup.png",
+          "description": "Facebook Setup page"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:21.594Z"
+    },
+    {
+      "test": "App handles unknown routes gracefully",
+      "passed": true,
+      "details": "App did not crash on invalid route",
+      "screenshots": [
+        {
+          "filename": "39-error-404-route.png",
+          "description": "Non-existent route handling"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:22.673Z"
+    },
+    {
+      "test": "Dark theme applied",
+      "passed": false,
+      "details": "Background: rgba(0, 0, 0, 0)",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:50:23.685Z"
+    },
+    {
+      "test": "Sidebar has dark background",
+      "passed": false,
+      "details": "Sidebar bg: oklch(0.279 0.041 260.031)",
+      "screenshots": [],
+      "timestamp": "2026-02-16T06:50:23.688Z"
+    },
+    {
+      "test": "Active nav item is highlighted",
+      "passed": true,
+      "details": "Blue accent on active nav",
+      "screenshots": [
+        {
+          "filename": "40-theme-consistency.png",
+          "description": "Theme consistency check — dark mode"
+        }
+      ],
+      "timestamp": "2026-02-16T06:50:23.691Z"
+    }
+  ]
+}

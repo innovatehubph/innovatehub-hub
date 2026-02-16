@@ -56,7 +56,7 @@ export function useParseQuery(options: UseParseQueryOptions): UseParseQueryResul
         query.count({ useMasterKey: true }),
       ]);
 
-      setData(results.map(r => ({ ...r.toJSON(), _parseObj: r })));
+      setData(results.map((r: any) => ({ ...r.toJSON(), _parseObj: r })));
       setCount(total);
     } catch (err: any) {
       setError(err.message || 'Query failed');
