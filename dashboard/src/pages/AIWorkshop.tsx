@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Wand2, Send, Loader2, Check, X, Rocket, Code2, FileCode, RotateCcw, Sparkles } from 'lucide-react';
+import { Wand2, Send, Loader2, Check, X, Rocket, Code2, FileCode, RotateCcw, Sparkles, ShieldCheck, GitBranch, ArrowRight, AlertTriangle } from 'lucide-react';
 
 const AI_PROXY = 'http://72.61.113.227:3456';
 
@@ -17,13 +17,30 @@ interface GenerateResult {
   schema?: { className: string; fields: Record<string, string> } | null;
 }
 
+interface QAIssue {
+  severity: 'critical' | 'warning' | 'info';
+  file: string;
+  message: string;
+}
+
+interface QAResult {
+  approved: boolean;
+  score: number;
+  issues: QAIssue[];
+  suggestions: string[];
+  summary: string;
+  branch?: string;
+}
+
 interface HistoryEntry {
   id: string;
   prompt: string;
   plan: string;
-  status: 'generated' | 'deployed' | 'failed';
+  status: 'generated' | 'staged' | 'qa-passed' | 'qa-failed' | 'deployed' | 'failed' | 'rolled-back';
   timestamp: number;
 }
+
+type Stage = 'idle' | 'generating' | 'generated' | 'staging' | 'staged' | 'reviewing' | 'reviewed' | 'promoting' | 'deployed';
 
 const TEMPLATES = [
   { label: 'CRM Contacts', prompt: 'Create a CRM Contacts page that displays a table of customer contacts with name, email, phone, company, status (lead/customer/churned), last contacted date, and notes. Include stats at the top showing total contacts, active customers, and new leads this month. Use a new Parse class called CRMContact with fields: name (String), email (String), phone (String), company (String), status (String), lastContactedAt (Date), notes (String), business (Pointer<Business>).' },
@@ -40,12 +57,13 @@ interface AIWorkshopProps {
 
 export default function AIWorkshop({ businessId }: AIWorkshopProps) {
   const [prompt, setPrompt] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [deploying, setDeploying] = useState(false);
+  const [stage, setStage] = useState<Stage>('idle');
   const [result, setResult] = useState<GenerateResult | null>(null);
+  const [qaResult, setQaResult] = useState<QAResult | null>(null);
+  const [stagingBranch, setStagingBranch] = useState('');
   const [error, setError] = useState('');
   const [activeFileIdx, setActiveFileIdx] = useState(0);
-  const [deployLog, setDeployLog] = useState<string[]>([]);
+  const [pipelineLog, setPipelineLog] = useState<string[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('ai_workshop_history') || '[]');
@@ -57,13 +75,28 @@ export default function AIWorkshop({ businessId }: AIWorkshopProps) {
     localStorage.setItem('ai_workshop_history', JSON.stringify(history.slice(-20)));
   }, [history]);
 
+  const addLog = (msg: string) => setPipelineLog(prev => [...prev, msg]);
+
+  const resetAll = () => {
+    setResult(null);
+    setQaResult(null);
+    setStagingBranch('');
+    setPrompt('');
+    setError('');
+    setPipelineLog([]);
+    setStage('idle');
+  };
+
+  // Step 1: Generate code
   const generate = async (text?: string) => {
     const p = text || prompt.trim();
-    if (!p || generating) return;
-    setGenerating(true);
+    if (!p || stage === 'generating') return;
+    setStage('generating');
     setError('');
     setResult(null);
-    setDeployLog([]);
+    setQaResult(null);
+    setPipelineLog([]);
+    addLog('Generating code with Claude AI...');
 
     try {
       const res = await fetch(`${AI_PROXY}/agent/generate`, {
@@ -77,6 +110,8 @@ export default function AIWorkshop({ businessId }: AIWorkshopProps) {
 
       setResult(data);
       setActiveFileIdx(0);
+      setStage('generated');
+      addLog(`Generated ${data.files?.length || 0} files: ${data.plan}`);
       setHistory(prev => [...prev, {
         id: Date.now().toString(),
         prompt: p,
@@ -86,15 +121,15 @@ export default function AIWorkshop({ businessId }: AIWorkshopProps) {
       }]);
     } catch (err: any) {
       setError(err.message);
-    } finally {
-      setGenerating(false);
+      setStage('idle');
     }
   };
 
-  const deploy = async () => {
-    if (!result || deploying) return;
-    setDeploying(true);
-    setDeployLog(['Starting deployment...']);
+  // Step 2: Deploy to staging branch (build-test only)
+  const deployToStaging = async () => {
+    if (!result || stage === 'staging') return;
+    setStage('staging');
+    addLog('Creating staging branch...');
 
     try {
       const res = await fetch(`${AI_PROXY}/agent/apply`, {
@@ -105,36 +140,127 @@ export default function AIWorkshop({ businessId }: AIWorkshopProps) {
           route: result.route,
           navItem: result.navItem,
           schema: result.schema,
+          plan: result.plan,
         }),
       });
       const data = await res.json();
 
-      const logs: string[] = [];
       for (const entry of (data.log || [])) {
-        if (entry.step === 'schema') logs.push(`Schema: ${entry.success ? 'Created' : 'Failed'}`);
-        if (entry.step === 'write') logs.push(`Files: ${entry.files?.length || 0} written`);
-        if (entry.step === 'route') logs.push(`Route: ${entry.path} added`);
-        if (entry.step === 'nav') logs.push(`Nav: "${entry.label}" added`);
-        if (entry.step === 'build') logs.push(`Build: ${entry.success ? 'Success' : 'FAILED'}`);
-        if (entry.step === 'deploy') logs.push(`Deploy: ${entry.success ? 'Live!' : 'FAILED'}`);
+        if (entry.step === 'branch') addLog(`Branch: ${entry.branch}`);
+        if (entry.step === 'schema') addLog(`Schema: ${entry.success ? 'Created' : 'Failed'}`);
+        if (entry.step === 'write') addLog(`Files: ${entry.files?.length || 0} written`);
+        if (entry.step === 'route') addLog(`Route: ${entry.path} added`);
+        if (entry.step === 'nav') addLog(`Nav: "${entry.label}" added`);
+        if (entry.step === 'build') addLog(`Build: ${entry.success ? 'Success' : 'FAILED'}`);
+        if (entry.step === 'commit') addLog(`Committed to staging`);
+        if (entry.step === 'rollback') addLog(`Rolled back: ${entry.reason}`);
       }
-      setDeployLog(logs);
 
       if (data.success) {
-        setHistory(prev => prev.map((h, i) =>
-          i === prev.length - 1 ? { ...h, status: 'deployed' } : h
-        ));
+        setStagingBranch(data.branch);
+        setStage('staged');
+        addLog('Staged successfully — ready for QA review');
+        updateLastHistory('staged');
       } else {
-        setHistory(prev => prev.map((h, i) =>
-          i === prev.length - 1 ? { ...h, status: 'failed' } : h
-        ));
+        setStage('generated');
+        addLog(`Staging failed: ${data.error || 'Unknown error'}`);
+        updateLastHistory('failed');
       }
     } catch (err: any) {
-      setDeployLog(prev => [...prev, `Error: ${err.message}`]);
-    } finally {
-      setDeploying(false);
+      addLog(`Error: ${err.message}`);
+      setStage('generated');
     }
   };
+
+  // Step 3: AI QA review
+  const runQA = async () => {
+    if (stage === 'reviewing') return;
+    setStage('reviewing');
+    addLog('Running AI QA review...');
+
+    try {
+      const res = await fetch(`${AI_PROXY}/agent/qa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'QA review failed');
+
+      setQaResult(data);
+      setStage('reviewed');
+      addLog(`QA Score: ${data.score}/10 — ${data.approved ? 'APPROVED' : 'NEEDS FIXES'}`);
+      if (data.issues?.length > 0) {
+        for (const issue of data.issues) {
+          addLog(`  ${issue.severity === 'critical' ? '[CRITICAL]' : issue.severity === 'warning' ? '[WARN]' : '[INFO]'} ${issue.message}`);
+        }
+      }
+      updateLastHistory(data.approved ? 'qa-passed' : 'qa-failed');
+    } catch (err: any) {
+      addLog(`QA Error: ${err.message}`);
+      setStage('staged');
+    }
+  };
+
+  // Step 4: Promote to production
+  const promote = async () => {
+    if (stage === 'promoting') return;
+    setStage('promoting');
+    addLog('Promoting to production...');
+
+    try {
+      const res = await fetch(`${AI_PROXY}/agent/promote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+
+      for (const entry of (data.log || [])) {
+        if (entry.step === 'merge') addLog(`Merge: ${entry.success ? 'Success' : 'FAILED'}`);
+        if (entry.step === 'build') addLog(`Build: ${entry.success ? 'Success' : 'FAILED'}`);
+        if (entry.step === 'deploy') addLog(`Deploy: ${entry.success ? 'LIVE!' : 'FAILED'}`);
+      }
+
+      if (data.success) {
+        setStage('deployed');
+        addLog('Production deploy complete — refresh to see changes!');
+        updateLastHistory('deployed');
+      } else {
+        setStage('reviewed');
+        addLog(`Promote failed: ${data.error}`);
+        updateLastHistory('failed');
+      }
+    } catch (err: any) {
+      addLog(`Promote Error: ${err.message}`);
+      setStage('reviewed');
+    }
+  };
+
+  // Rollback staging
+  const rollback = async () => {
+    addLog('Rolling back staging...');
+    try {
+      await fetch(`${AI_PROXY}/agent/rollback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      addLog('Staging rolled back');
+      updateLastHistory('rolled-back');
+      resetAll();
+    } catch (err: any) {
+      addLog(`Rollback Error: ${err.message}`);
+    }
+  };
+
+  const updateLastHistory = (status: HistoryEntry['status']) => {
+    setHistory(prev => prev.map((h, i) =>
+      i === prev.length - 1 ? { ...h, status } : h
+    ));
+  };
+
+  const isWorking = ['generating', 'staging', 'reviewing', 'promoting'].includes(stage);
 
   return (
     <div className="space-y-6">
@@ -145,19 +271,49 @@ export default function AIWorkshop({ businessId }: AIWorkshopProps) {
             AI Workshop
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Describe a feature and Claude will generate the code, build it, and deploy it live
+            Generate → Stage → QA Review → Deploy to Production
           </p>
         </div>
-        {result && (
-          <button onClick={() => { setResult(null); setPrompt(''); setError(''); setDeployLog([]); }}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-400 hover:text-white bg-slate-800 rounded-lg border border-slate-700">
+        {stage !== 'idle' && (
+          <button onClick={resetAll} disabled={isWorking}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-400 hover:text-white bg-slate-800 rounded-lg border border-slate-700 disabled:opacity-50">
             <RotateCcw size={14} /> New
           </button>
         )}
       </div>
 
+      {/* Pipeline Progress Bar */}
+      {stage !== 'idle' && (
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+          <div className="flex items-center justify-between text-xs">
+            {(['Generate', 'Stage', 'QA Review', 'Deploy'] as const).map((step, i) => {
+              const stageMap: Record<string, number> = {
+                generating: 0, generated: 1, staging: 1, staged: 2, reviewing: 2, reviewed: 3, promoting: 3, deployed: 4,
+              };
+              const current = stageMap[stage] ?? 0;
+              const isActive = current === i;
+              const isDone = current > i;
+              const isFinal = step === 'Deploy' && stage === 'deployed';
+              return (
+                <div key={step} className="flex items-center flex-1">
+                  <div className={`flex items-center gap-1.5 ${isDone || isFinal ? 'text-emerald-400' : isActive ? 'text-purple-400' : 'text-slate-600'}`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 ${
+                      isDone || isFinal ? 'border-emerald-400 bg-emerald-400/20' : isActive ? 'border-purple-400 bg-purple-400/20' : 'border-slate-600'
+                    }`}>
+                      {isDone || isFinal ? <Check size={12} /> : i + 1}
+                    </div>
+                    <span className="font-medium">{step}</span>
+                  </div>
+                  {i < 3 && <div className={`flex-1 h-0.5 mx-2 ${isDone ? 'bg-emerald-400/50' : 'bg-slate-700'}`} />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Templates */}
-      {!result && (
+      {stage === 'idle' && (
         <div>
           <h3 className="text-sm font-medium text-slate-400 mb-2 flex items-center gap-1">
             <Sparkles size={14} /> Quick Templates
@@ -165,8 +321,7 @@ export default function AIWorkshop({ businessId }: AIWorkshopProps) {
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             {TEMPLATES.map(t => (
               <button key={t.label} onClick={() => { setPrompt(t.prompt); generate(t.prompt); }}
-                disabled={generating}
-                className="text-left p-3 rounded-lg bg-slate-800 border border-slate-700 hover:border-purple-500/50 hover:bg-slate-800/80 transition-colors disabled:opacity-50">
+                className="text-left p-3 rounded-lg bg-slate-800 border border-slate-700 hover:border-purple-500/50 hover:bg-slate-800/80 transition-colors">
                 <span className="text-sm font-medium text-white">{t.label}</span>
                 <p className="text-xs text-slate-500 mt-1 line-clamp-2">{t.prompt.slice(0, 80)}...</p>
               </button>
@@ -176,7 +331,7 @@ export default function AIWorkshop({ businessId }: AIWorkshopProps) {
       )}
 
       {/* Input */}
-      {!result && (
+      {stage === 'idle' && (
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
           <textarea
             ref={inputRef}
@@ -185,17 +340,24 @@ export default function AIWorkshop({ businessId }: AIWorkshopProps) {
             onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) generate(); }}
             placeholder="Describe the feature you want to build... (e.g. 'Create a CRM page with contact management')"
             rows={4}
-            disabled={generating}
-            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
           <div className="flex items-center justify-between mt-3">
             <span className="text-xs text-slate-500">Cmd+Enter to generate</span>
-            <button onClick={() => generate()} disabled={!prompt.trim() || generating}
+            <button onClick={() => generate()} disabled={!prompt.trim()}
               className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-              {generating ? <Loader2 className="animate-spin" size={16} /> : <Wand2 size={16} />}
-              {generating ? 'Generating...' : 'Generate'}
+              <Wand2 size={16} />
+              Generate
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Loading state */}
+      {stage === 'generating' && (
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-8 flex flex-col items-center gap-3">
+          <Loader2 className="animate-spin text-purple-400" size={32} />
+          <p className="text-slate-400 text-sm">Claude is generating your feature...</p>
         </div>
       )}
 
@@ -204,85 +366,174 @@ export default function AIWorkshop({ businessId }: AIWorkshopProps) {
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
           <X className="text-red-400 shrink-0 mt-0.5" size={18} />
           <div>
-            <p className="text-red-400 text-sm font-medium">Generation Failed</p>
+            <p className="text-red-400 text-sm font-medium">Error</p>
             <p className="text-red-400/70 text-xs mt-1">{error}</p>
           </div>
         </div>
       )}
 
       {/* Results */}
-      {result && (
+      {result && stage !== 'generating' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Left: Plan + Deploy */}
+          {/* Left: Plan + Actions + QA + Pipeline Log */}
           <div className="space-y-4">
+            {/* Plan */}
             <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
               <h3 className="text-sm font-medium text-purple-400 mb-2 flex items-center gap-1">
                 <Code2 size={14} /> Plan
               </h3>
               <p className="text-sm text-slate-300">{result.plan}</p>
-
               <div className="mt-3 space-y-1 text-xs text-slate-400">
                 {result.files?.map((f, i) => (
                   <div key={i} className="flex items-center gap-1">
                     <FileCode size={12} className={f.action === 'create' ? 'text-emerald-400' : 'text-amber-400'} />
                     <span>{f.path}</span>
-                    <span className={`ml-auto ${f.action === 'create' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                      {f.action}
-                    </span>
+                    <span className={`ml-auto ${f.action === 'create' ? 'text-emerald-400' : 'text-amber-400'}`}>{f.action}</span>
                   </div>
                 ))}
-                {result.route && (
-                  <div className="flex items-center gap-1 text-blue-400">
-                    + Route: {result.route.path}
-                  </div>
-                )}
-                {result.navItem && (
-                  <div className="flex items-center gap-1 text-blue-400">
-                    + Nav: {result.navItem.label}
-                  </div>
-                )}
-                {result.schema && (
-                  <div className="flex items-center gap-1 text-cyan-400">
-                    + Schema: {result.schema.className}
-                  </div>
-                )}
+                {result.route && <div className="text-blue-400">+ Route: {result.route.path}</div>}
+                {result.navItem && <div className="text-blue-400">+ Nav: {result.navItem.label}</div>}
+                {result.schema && <div className="text-cyan-400">+ Schema: {result.schema.className}</div>}
               </div>
             </div>
 
-            {/* Deploy */}
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-              <button onClick={deploy} disabled={deploying}
-                className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg font-medium transition-colors disabled:opacity-50">
-                {deploying ? <Loader2 className="animate-spin" size={18} /> : <Rocket size={18} />}
-                {deploying ? 'Deploying...' : 'Deploy to Production'}
-              </button>
+            {/* Action Buttons */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-2">
+              {/* Stage button */}
+              {stage === 'generated' && (
+                <button onClick={deployToStaging} disabled={isWorking}
+                  className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-3 rounded-lg font-medium transition-colors disabled:opacity-50">
+                  <GitBranch size={18} />
+                  Deploy to Staging
+                </button>
+              )}
 
-              {deployLog.length > 0 && (
-                <div className="mt-3 space-y-1">
-                  {deployLog.map((line, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs">
-                      {line.includes('FAILED') || line.includes('Error') ? (
-                        <X size={12} className="text-red-400" />
-                      ) : line.includes('Live') || line.includes('Success') ? (
-                        <Check size={12} className="text-emerald-400" />
+              {/* QA button */}
+              {stage === 'staged' && (
+                <button onClick={runQA} disabled={isWorking}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-medium transition-colors disabled:opacity-50">
+                  <ShieldCheck size={18} />
+                  Run AI QA Review
+                </button>
+              )}
+
+              {/* Working spinner */}
+              {(stage === 'staging' || stage === 'reviewing' || stage === 'promoting') && (
+                <div className="w-full flex items-center justify-center gap-2 bg-slate-700 text-slate-300 px-4 py-3 rounded-lg font-medium">
+                  <Loader2 className="animate-spin" size={18} />
+                  {stage === 'staging' ? 'Deploying to staging...' : stage === 'reviewing' ? 'AI reviewing code...' : 'Promoting to production...'}
+                </div>
+              )}
+
+              {/* Promote button (only if QA passed) */}
+              {stage === 'reviewed' && qaResult?.approved && (
+                <button onClick={promote} disabled={isWorking}
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg font-medium transition-colors disabled:opacity-50">
+                  <Rocket size={18} />
+                  Deploy to Production
+                </button>
+              )}
+
+              {/* Force promote (QA failed but user can override) */}
+              {stage === 'reviewed' && !qaResult?.approved && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-amber-400 text-xs">
+                    <AlertTriangle size={14} />
+                    QA flagged issues. You can still force-deploy or rollback.
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={promote} disabled={isWorking}
+                      className="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                      <Rocket size={16} />
+                      Force Deploy
+                    </button>
+                    <button onClick={rollback} disabled={isWorking}
+                      className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                      <X size={16} />
+                      Rollback
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Deployed success */}
+              {stage === 'deployed' && (
+                <div className="text-center py-2">
+                  <p className="text-emerald-400 font-medium flex items-center justify-center gap-2">
+                    <Check size={18} /> Deployed to Production!
+                  </p>
+                  <p className="text-slate-500 text-xs mt-1">Refresh the page to see your new feature</p>
+                </div>
+              )}
+
+              {/* Rollback button (available when staged or reviewed) */}
+              {(stage === 'staged' || (stage === 'reviewed' && qaResult?.approved)) && (
+                <button onClick={rollback} disabled={isWorking}
+                  className="w-full flex items-center justify-center gap-2 text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50">
+                  <X size={14} />
+                  Rollback Staging
+                </button>
+              )}
+            </div>
+
+            {/* QA Results */}
+            {qaResult && (
+              <div className={`border rounded-xl p-4 ${qaResult.approved ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-amber-500/5 border-amber-500/30'}`}>
+                <h3 className={`text-sm font-medium mb-2 flex items-center gap-1 ${qaResult.approved ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <ShieldCheck size={14} />
+                  QA Review — {qaResult.score}/10
+                </h3>
+                <p className="text-sm text-slate-300 mb-2">{qaResult.summary}</p>
+                {qaResult.issues?.length > 0 && (
+                  <div className="space-y-1 mt-2">
+                    {qaResult.issues.map((issue, i) => (
+                      <div key={i} className={`text-xs flex items-start gap-1 ${
+                        issue.severity === 'critical' ? 'text-red-400' : issue.severity === 'warning' ? 'text-amber-400' : 'text-slate-400'
+                      }`}>
+                        <span className="shrink-0 font-mono uppercase">[{issue.severity}]</span>
+                        <span>{issue.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {qaResult.suggestions?.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-slate-500 font-medium">Suggestions:</p>
+                    {qaResult.suggestions.map((s, i) => (
+                      <p key={i} className="text-xs text-slate-400">• {s}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Pipeline Log */}
+            {pipelineLog.length > 0 && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+                <h3 className="text-sm font-medium text-slate-400 mb-2">Pipeline Log</h3>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {pipelineLog.map((line, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs">
+                      {line.includes('FAILED') || line.includes('Error') || line.includes('[CRITICAL]') ? (
+                        <X size={12} className="text-red-400 shrink-0 mt-0.5" />
+                      ) : line.includes('LIVE') || line.includes('Success') || line.includes('complete') || line.includes('APPROVED') ? (
+                        <Check size={12} className="text-emerald-400 shrink-0 mt-0.5" />
+                      ) : line.includes('[WARN]') ? (
+                        <AlertTriangle size={12} className="text-amber-400 shrink-0 mt-0.5" />
                       ) : (
-                        <div className="w-3 h-3 rounded-full bg-slate-600" />
+                        <ArrowRight size={12} className="text-slate-600 shrink-0 mt-0.5" />
                       )}
                       <span className={
-                        line.includes('FAILED') || line.includes('Error') ? 'text-red-400' :
-                        line.includes('Live') || line.includes('Success') ? 'text-emerald-400' :
+                        line.includes('FAILED') || line.includes('Error') || line.includes('[CRITICAL]') ? 'text-red-400' :
+                        line.includes('LIVE') || line.includes('Success') || line.includes('complete') || line.includes('APPROVED') ? 'text-emerald-400' :
+                        line.includes('[WARN]') ? 'text-amber-400' :
                         'text-slate-400'
                       }>{line}</span>
                     </div>
                   ))}
-                  {deployLog.some(l => l.includes('Live')) && (
-                    <p className="text-emerald-400 text-xs mt-2 font-medium">
-                      Refresh the page to see your new feature!
-                    </p>
-                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* History */}
             {history.length > 0 && (
@@ -295,7 +546,11 @@ export default function AIWorkshop({ businessId }: AIWorkshopProps) {
                         <span className="text-slate-300 truncate">{h.plan || h.prompt.slice(0, 50)}</span>
                         <span className={`shrink-0 ml-2 ${
                           h.status === 'deployed' ? 'text-emerald-400' :
-                          h.status === 'failed' ? 'text-red-400' : 'text-amber-400'
+                          h.status === 'qa-passed' ? 'text-blue-400' :
+                          h.status === 'staged' ? 'text-amber-400' :
+                          h.status === 'failed' || h.status === 'qa-failed' ? 'text-red-400' :
+                          h.status === 'rolled-back' ? 'text-slate-500' :
+                          'text-purple-400'
                         }`}>{h.status}</span>
                       </div>
                       <span className="text-slate-600">{new Date(h.timestamp).toLocaleString()}</span>
@@ -321,6 +576,13 @@ export default function AIWorkshop({ businessId }: AIWorkshopProps) {
                 </button>
               ))}
             </div>
+            {/* Staging badge */}
+            {stagingBranch && (
+              <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-400">
+                <GitBranch size={12} />
+                <span className="font-mono">{stagingBranch}</span>
+              </div>
+            )}
             {/* Code */}
             <pre className="p-4 text-xs text-slate-300 overflow-auto max-h-[600px] leading-relaxed">
               <code>{result.files?.[activeFileIdx]?.content || 'No files generated'}</code>

@@ -1,7 +1,12 @@
 import express from 'express';
 import { readFileSync, writeFileSync } from 'fs';
 import { getFullContext } from './source-registry.js';
-import { writeFiles, patchAppRoutes, patchLayoutNav, buildDashboard, deployToBack4App, createSchema } from './deployer.js';
+import {
+  createStagingBranch, getCurrentBranch, switchToMain, deleteBranch,
+  writeFiles, patchAppRoutes, patchLayoutNav,
+  buildDashboard, commitStaging, mergeToMainAndDeploy, rollbackStaging,
+  deployToBack4App, createSchema,
+} from './deployer.js';
 
 const app = express();
 app.use(express.json({ limit: '5mb' }));
@@ -271,66 +276,233 @@ app.post('/agent/generate', authenticate, async (req, res) => {
   }
 });
 
-// ─── Agent: Apply Changes ───
+// ─── Agent: Apply to Staging ───
 let deployLock = false;
+const stagingState = {}; // { branch, files, route, navItem, schema, plan }
 
 app.post('/agent/apply', authenticate, async (req, res) => {
   if (deployLock) return res.status(409).json({ error: 'Deploy already in progress' });
   deployLock = true;
 
   try {
-    const { files, route, navItem, schema } = req.body;
+    const { files, route, navItem, schema, plan } = req.body;
     const log = [];
 
-    // 1. Create schema if needed
+    // 1. Create staging branch
+    const featureName = plan || 'feature';
+    console.log('[Agent] Creating staging branch for:', featureName);
+    const branch = createStagingBranch(featureName);
+    log.push({ step: 'branch', branch });
+
+    // 2. Create schema if needed
     if (schema) {
       console.log('[Agent] Creating schema:', schema.className);
       const schemaResult = createSchema(schema.className, schema.fields);
       log.push({ step: 'schema', ...schemaResult });
     }
 
-    // 2. Write files
+    // 3. Write files
     if (files && files.length > 0) {
       console.log('[Agent] Writing', files.length, 'files');
       const writeResult = writeFiles(files);
       log.push({ step: 'write', files: writeResult });
     }
 
-    // 3. Patch routes
+    // 4. Patch routes
     if (route) {
       console.log('[Agent] Adding route:', route.path);
       patchAppRoutes(route);
       log.push({ step: 'route', path: route.path });
     }
 
-    // 4. Patch nav
+    // 5. Patch nav
     if (navItem) {
       console.log('[Agent] Adding nav item:', navItem.label);
       patchLayoutNav(navItem);
       log.push({ step: 'nav', label: navItem.label });
     }
 
-    // 5. Build
-    console.log('[Agent] Building dashboard...');
+    // 6. Build (test only, NOT deployed to production)
+    console.log('[Agent] Building dashboard on staging...');
     const buildResult = buildDashboard();
     log.push({ step: 'build', ...buildResult });
 
     if (!buildResult.success) {
-      return res.json({ success: false, log, error: 'Build failed' });
+      // Rollback staging branch on build failure
+      console.log('[Agent] Build failed, rolling back staging branch');
+      rollbackStaging(branch);
+      log.push({ step: 'rollback', reason: 'build failed' });
+      return res.json({ success: false, log, error: 'Build failed — staging rolled back' });
     }
 
-    // 6. Deploy
-    console.log('[Agent] Deploying to Back4App...');
-    const deployResult = deployToBack4App();
-    log.push({ step: 'deploy', ...deployResult });
+    // 7. Commit to staging (not main)
+    const commitResult = commitStaging(`feat: ${featureName}`);
+    log.push({ step: 'commit', ...commitResult });
 
-    console.log('[Agent] Deploy complete:', deployResult.success);
-    res.json({ success: deployResult.success, log });
+    // Store staging state for QA/promote
+    stagingState.branch = branch;
+    stagingState.files = files;
+    stagingState.route = route;
+    stagingState.navItem = navItem;
+    stagingState.schema = schema;
+    stagingState.plan = plan || '';
+
+    console.log('[Agent] Staged on branch:', branch);
+    res.json({ success: true, branch, log, status: 'staged' });
   } catch (err) {
     console.error('[Agent] Apply error:', err.message);
+    // Try to recover to main
+    try { switchToMain(); } catch {}
     res.status(500).json({ error: err.message });
   } finally {
     deployLock = false;
+  }
+});
+
+// ─── Agent: QA Review ───
+app.post('/agent/qa', authenticate, async (req, res) => {
+  try {
+    if (!stagingState.branch) {
+      return res.status(400).json({ error: 'No staging branch active. Run /agent/apply first.' });
+    }
+
+    console.log('[Agent] Running QA review on branch:', stagingState.branch);
+
+    const sourceContext = getFullContext();
+    const filesToReview = (stagingState.files || []).map(f => `--- ${f.path} (${f.action}) ---\n${f.content}`).join('\n\n');
+
+    const qaPrompt = `You are an expert QA engineer and code reviewer for a React + TypeScript + Tailwind CSS dashboard app.
+
+## Your task
+Review the following generated code for quality, correctness, and safety before it goes to production.
+
+## Tech Stack
+- React 19 + TypeScript + Vite 7
+- Tailwind CSS v4 (utility classes only)
+- Parse SDK (Back4App) for data
+- lucide-react icons
+- HashRouter (react-router-dom v7)
+
+## Current routes in the app:
+${sourceContext.routes.map(r => `${r.path} → ${r.component}`).join('\n')}
+
+## Current nav items:
+${sourceContext.navItems.map(n => `${n.path} → ${n.label}`).join('\n')}
+
+## Code to review:
+${filesToReview}
+
+${stagingState.route ? `New route: ${stagingState.route.path} → ${stagingState.route.component}` : ''}
+${stagingState.navItem ? `New nav item: ${stagingState.navItem.path} → ${stagingState.navItem.label}` : ''}
+${stagingState.schema ? `New schema: ${stagingState.schema.className} with fields: ${JSON.stringify(stagingState.schema.fields)}` : ''}
+
+## Review Criteria
+1. **TypeScript correctness**: Proper types, no any where avoidable, correct prop types
+2. **React best practices**: Proper hooks usage, no memory leaks, correct dependencies in useEffect
+3. **Security**: No XSS, no injection vulnerabilities, proper data sanitization
+4. **UI/UX**: Consistent Tailwind styling with existing dark theme (slate-800/900 bg, blue/purple accents), responsive design
+5. **Data handling**: Correct Parse queries, proper error handling, loading states
+6. **Route/Nav conflicts**: No duplicate routes or nav items
+7. **Import correctness**: All imports resolve to existing or newly created files
+
+## Response Format (JSON only)
+{
+  "approved": true/false,
+  "score": 1-10,
+  "issues": [
+    { "severity": "critical|warning|info", "file": "path", "line": null, "message": "description" }
+  ],
+  "suggestions": ["suggestion 1", "suggestion 2"],
+  "summary": "Brief overall assessment"
+}`;
+
+    const responseText = await callClaude(qaPrompt, [
+      { role: 'user', content: 'Review this code and provide your assessment.' }
+    ], 4096);
+
+    let qaResult;
+    try {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      qaResult = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
+    } catch {
+      qaResult = { approved: false, score: 0, summary: 'Failed to parse QA response', issues: [], suggestions: [], raw: responseText.slice(0, 1000) };
+    }
+
+    console.log('[Agent] QA result: approved=%s score=%d', qaResult.approved, qaResult.score);
+    res.json({ ...qaResult, branch: stagingState.branch });
+  } catch (err) {
+    console.error('[Agent] QA error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Agent: Promote to Production ───
+app.post('/agent/promote', authenticate, async (req, res) => {
+  if (deployLock) return res.status(409).json({ error: 'Deploy already in progress' });
+  deployLock = true;
+
+  try {
+    if (!stagingState.branch) {
+      return res.status(400).json({ error: 'No staging branch to promote. Run /agent/apply first.' });
+    }
+
+    const branch = stagingState.branch;
+    console.log('[Agent] Promoting branch to production:', branch);
+    const log = [];
+
+    // Merge staging → main, build, deploy
+    const result = mergeToMainAndDeploy(branch);
+
+    if (result.success) {
+      log.push({ step: 'merge', success: true });
+      log.push({ step: 'build', success: true });
+      log.push({ step: 'deploy', success: true, output: result.deployOutput });
+
+      // Clear staging state
+      stagingState.branch = null;
+      stagingState.files = null;
+      stagingState.route = null;
+      stagingState.navItem = null;
+      stagingState.schema = null;
+      stagingState.plan = '';
+
+      console.log('[Agent] Production deploy complete');
+      res.json({ success: true, log, status: 'deployed' });
+    } else {
+      log.push({ step: result.step, success: false, output: result.output });
+      console.log('[Agent] Promote failed at step:', result.step);
+      res.json({ success: false, log, error: `Failed at ${result.step}: ${result.output}` });
+    }
+  } catch (err) {
+    console.error('[Agent] Promote error:', err.message);
+    try { switchToMain(); } catch {}
+    res.status(500).json({ error: err.message });
+  } finally {
+    deployLock = false;
+  }
+});
+
+// ─── Agent: Rollback Staging ───
+app.post('/agent/rollback', authenticate, (req, res) => {
+  try {
+    if (!stagingState.branch) {
+      return res.status(400).json({ error: 'No staging branch to rollback' });
+    }
+    const branch = stagingState.branch;
+    console.log('[Agent] Rolling back staging branch:', branch);
+    const result = rollbackStaging(branch);
+
+    // Clear staging state
+    stagingState.branch = null;
+    stagingState.files = null;
+    stagingState.route = null;
+    stagingState.navItem = null;
+    stagingState.schema = null;
+    stagingState.plan = '';
+
+    res.json({ success: result.success, branch });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -348,14 +520,20 @@ app.post('/agent/schema', authenticate, async (req, res) => {
 
 // ─── Agent: Status ───
 app.get('/agent/status', authenticate, (req, res) => {
+  const ctx = getFullContext();
   res.json({
     deploying: deployLock,
-    sourceFiles: Object.keys(getFullContext().files).length,
-    routes: getFullContext().routes.length,
+    sourceFiles: Object.keys(ctx.files).length,
+    routes: ctx.routes.length,
+    staging: stagingState.branch ? {
+      branch: stagingState.branch,
+      plan: stagingState.plan,
+      files: (stagingState.files || []).map(f => f.path),
+    } : null,
   });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[AI Proxy] InnovateHub AI Proxy running on http://0.0.0.0:${PORT}`);
-  console.log(`[AI Proxy] Agent endpoints: /agent/generate, /agent/apply, /agent/source, /agent/schema`);
+  console.log(`[AI Proxy] Endpoints: /agent/generate, /agent/apply, /agent/qa, /agent/promote, /agent/rollback`);
 });

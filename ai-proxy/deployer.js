@@ -1,11 +1,47 @@
-// Deployer - writes files, patches routes/nav, builds, and deploys to Back4App
-import { writeFileSync, readFileSync, mkdirSync, existsSync, cpSync, readdirSync, statSync } from 'fs';
+// Deployer - staging-first pipeline: branch → write → build → QA → merge → deploy
+import { writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { execSync } from 'child_process';
 
-const DASHBOARD_DIR = '/root/innovatehub-hub/dashboard';
+const PROJECT_DIR = '/root/innovatehub-hub';
+const DASHBOARD_DIR = join(PROJECT_DIR, 'dashboard');
 const SRC_DIR = join(DASHBOARD_DIR, 'src');
-const B4A_DEPLOY_DIR = '/root/innovatehub-hub/b4a-deploy';
+const B4A_DEPLOY_DIR = join(PROJECT_DIR, 'b4a-deploy');
+
+function git(cmd) {
+  return execSync(`git ${cmd}`, { cwd: PROJECT_DIR, encoding: 'utf-8', timeout: 30000 }).trim();
+}
+
+// ─── Staging Branch Management ───
+
+export function createStagingBranch(featureName) {
+  const slug = featureName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+  const branch = `staging/${slug}-${Date.now().toString(36)}`;
+
+  // Ensure we're on main and clean
+  try { git('stash'); } catch {}
+  git('checkout main');
+  git(`checkout -b ${branch}`);
+
+  return branch;
+}
+
+export function getCurrentBranch() {
+  return git('rev-parse --abbrev-ref HEAD');
+}
+
+export function switchToMain() {
+  git('checkout main');
+}
+
+export function deleteBranch(branch) {
+  try {
+    git('checkout main');
+    git(`branch -D ${branch}`);
+  } catch {}
+}
+
+// ─── File Writing (staging) ───
 
 export function writeFiles(files) {
   const results = [];
@@ -19,24 +55,16 @@ export function writeFiles(files) {
 }
 
 export function patchAppRoutes(newRoute) {
-  // newRoute: { path, component, importPath }
   const appPath = join(SRC_DIR, 'App.tsx');
   let content = readFileSync(appPath, 'utf-8');
 
-  // Add import if not present
   const importLine = `import ${newRoute.component} from '${newRoute.importPath}'`;
   if (!content.includes(importLine)) {
-    // Insert before the 'export default' line
-    content = content.replace(
-      /^(export default function App)/m,
-      `${importLine}\n\n$1`
-    );
+    content = content.replace(/^(export default function App)/m, `${importLine}\n\n$1`);
   }
 
-  // Add Route if not present
   const routeTag = `path="${newRoute.path}"`;
   if (!content.includes(routeTag)) {
-    // Insert before the closing </Routes>
     const routeLine = `        <Route path="${newRoute.path}" element={<${newRoute.component} businessId={activeBusiness} />} />`;
     content = content.replace('      </Routes>', `${routeLine}\n      </Routes>`);
   }
@@ -45,31 +73,22 @@ export function patchAppRoutes(newRoute) {
 }
 
 export function patchLayoutNav(newNavItem) {
-  // newNavItem: { path, label, icon }
   const layoutPath = join(SRC_DIR, 'components/Layout.tsx');
   let content = readFileSync(layoutPath, 'utf-8');
 
-  // Check if icon is already imported
   if (!content.includes(newNavItem.icon)) {
-    // Add to the lucide-react import
-    content = content.replace(
-      /} from 'lucide-react'/,
-      `, ${newNavItem.icon}} from 'lucide-react'`
-    );
+    content = content.replace(/} from 'lucide-react'/, `, ${newNavItem.icon}} from 'lucide-react'`);
   }
 
-  // Add nav item if not present
   const navEntry = `{ path: '${newNavItem.path}', label: '${newNavItem.label}', icon: ${newNavItem.icon} }`;
   if (!content.includes(`path: '${newNavItem.path}'`)) {
-    // Insert before the last item (Settings)
-    content = content.replace(
-      /(\{ path: '\/settings',)/,
-      `${navEntry},\n  $1`
-    );
+    content = content.replace(/(\{ path: '\/settings',)/, `${navEntry},\n  $1`);
   }
 
   writeFileSync(layoutPath, content);
 }
+
+// ─── Build ───
 
 export function buildDashboard() {
   try {
@@ -84,6 +103,77 @@ export function buildDashboard() {
     return { success: false, output: err.stderr || err.stdout || err.message };
   }
 }
+
+// ─── Git Commit (staging) ───
+
+export function commitStaging(message) {
+  try {
+    git('add -A');
+    const output = git(`commit -m "${message.replace(/"/g, '\\"')}"`);
+    return { success: true, output };
+  } catch (err) {
+    return { success: false, output: err.message };
+  }
+}
+
+// ─── Merge to Main & Deploy ───
+
+export function mergeToMainAndDeploy(branch) {
+  try {
+    // Switch to main
+    git('checkout main');
+
+    // Merge the staging branch
+    const mergeOutput = git(`merge ${branch} --no-edit`);
+
+    // Build production
+    const buildResult = buildDashboard();
+    if (!buildResult.success) {
+      // Revert merge if build fails
+      git('reset --hard HEAD~1');
+      return { success: false, step: 'build', output: buildResult.output };
+    }
+
+    // Deploy
+    const deployResult = deployToBack4App();
+    if (!deployResult.success) {
+      return { success: false, step: 'deploy', output: deployResult.output };
+    }
+
+    // Push to GitHub
+    try {
+      git('push origin main');
+    } catch (pushErr) {
+      // Non-critical - deploy succeeded
+    }
+
+    // Clean up staging branch
+    try { git(`branch -d ${branch}`); } catch {}
+
+    return { success: true, mergeOutput, deployOutput: deployResult.output };
+  } catch (err) {
+    // Recover - go back to main
+    try { git('checkout main'); } catch {}
+    return { success: false, step: 'merge', output: err.message };
+  }
+}
+
+// ─── Rollback ───
+
+export function rollbackStaging(branch) {
+  try {
+    // Discard staging changes, go back to main
+    git('checkout main');
+    git(`branch -D ${branch}`);
+    // Rebuild main
+    buildDashboard();
+    return { success: true };
+  } catch (err) {
+    return { success: false, output: err.message };
+  }
+}
+
+// ─── Deploy to Back4App ───
 
 function copyDirSync(src, dest) {
   mkdirSync(dest, { recursive: true });
@@ -100,17 +190,10 @@ function copyDirSync(src, dest) {
 
 export function deployToBack4App() {
   try {
-    // Copy dist to b4a-deploy/public
     const distDir = join(DASHBOARD_DIR, 'dist');
     const publicDir = join(B4A_DEPLOY_DIR, 'public');
-
-    // Remove old public
     execSync(`rm -rf "${publicDir}"`, { encoding: 'utf-8' });
-
-    // Copy new dist
     copyDirSync(distDir, publicDir);
-
-    // Deploy via b4a CLI
     const output = execSync('b4a deploy -f', {
       cwd: B4A_DEPLOY_DIR,
       timeout: 120000,
@@ -122,6 +205,8 @@ export function deployToBack4App() {
     return { success: false, output: err.stderr || err.stdout || err.message };
   }
 }
+
+// ─── Schema Management ───
 
 export function createSchema(className, fields) {
   const APP_ID = 'lOpBh4pgpWdiYJmAU4aXSNyYYY8d86hxH2hilkWN';
