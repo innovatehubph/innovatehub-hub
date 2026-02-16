@@ -1,0 +1,10 @@
+{
+  "name": "innovatehub-ai-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
+    "express": "^4.21.0"
+  }
+}

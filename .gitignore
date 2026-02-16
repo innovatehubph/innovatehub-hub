@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.parse.local
+*.log
+.DS_Store
+b4a-deploy/public/
