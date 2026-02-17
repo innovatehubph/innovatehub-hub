@@ -5496,3 +5496,105 @@ app.listen(PORT, () => {
   };
   scheduleWeeklyReport();
 });
+
+// ==================== AUTOMATION ENDPOINTS ====================
+
+// Combined: Generate Image + Send Email in one call
+app.post('/api/automation/generate-and-email', async (req, res) => {
+  try {
+    const { scene, customPrompt, recipients, subject, name } = req.body;
+    
+    if (!recipients || recipients.length === 0) {
+      return res.status(400).json({ error: 'recipients array is required' });
+    }
+    if (!scene && !customPrompt) {
+      return res.status(400).json({ error: 'scene or customPrompt is required' });
+    }
+    
+    // Step 1: Generate image
+    console.log('[Automation] Generating image for scene:', scene || 'custom');
+    const OpenRouterProvider = require('../image-generator/openrouter-provider');
+    const imageGen = new OpenRouterProvider();
+    
+    let imageResult;
+    if (scene) {
+      imageResult = await imageGen.generateScene(scene);
+    } else {
+      imageResult = await imageGen.generate(customPrompt);
+    }
+    
+    if (!imageResult.success) {
+      return res.status(500).json({ error: 'Image generation failed', details: imageResult });
+    }
+    
+    console.log('[Automation] Image generated:', imageResult.publicUrl);
+    
+    // Step 2: Send emails
+    const emailResults = [];
+    for (const email of recipients) {
+      try {
+        const result = await sendEmail({
+          to: email,
+          template: 'agent_recruitment',
+          subject: subject || 'Start Your Own PlataPay Outlet – Earn Up to ₱50,000/Month',
+          data: {
+            heroImage: imageResult.publicUrl,
+            name: name || '',
+            preheader: 'Be your own boss. Join 500+ successful PlataPay agents nationwide.'
+          }
+        });
+        emailResults.push({ email, success: true, messageId: result.messageId });
+      } catch (err) {
+        emailResults.push({ email, success: false, error: err.message });
+      }
+    }
+    
+    res.json({
+      success: true,
+      image: {
+        url: imageResult.publicUrl,
+        emailUrl: imageResult.emailUrl,
+        scene: scene || 'custom',
+        cost: imageResult.cost
+      },
+      emails: emailResults,
+      summary: {
+        totalRecipients: recipients.length,
+        sent: emailResults.filter(r => r.success).length,
+        failed: emailResults.filter(r => !r.success).length
+      }
+    });
+    
+  } catch (err) {
+    console.error('[Automation] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Quick generate for Facebook Ads (returns just the image URL)
+app.get('/api/automation/quick-image/:scene', async (req, res) => {
+  try {
+    const { scene } = req.params;
+    const OpenRouterProvider = require('../image-generator/openrouter-provider');
+    const imageGen = new OpenRouterProvider();
+    
+    const result = await imageGen.generateScene(scene);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        imageUrl: result.publicUrl,
+        facebookAdUrl: result.publicUrl, // Direct URL for FB Ads
+        emailUrl: result.emailUrl,
+        cost: result.cost
+      });
+    } else {
+      res.status(500).json({ error: 'Generation failed' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+console.log('[Server] Automation endpoints loaded');
+
