@@ -8,6 +8,7 @@ const express = require('express');
 const Parse = require('parse/node');
 const fetch = require('node-fetch');
 const nodemailer = require('nodemailer');
+const ImageGenerator = require('../image-generator');
 
 // --- Configuration ---
 const PORT = 3790;
@@ -4800,6 +4801,280 @@ async function sendWeeklyPerformanceReport() {
 app.post('/api/send-weekly-report', async (req, res) => {
   const result = await sendWeeklyPerformanceReport();
   res.json(result);
+});
+
+// =============================================================================
+// AI Image Generator Endpoints
+// =============================================================================
+
+const imageGenerator = new ImageGenerator({
+  outputDir: '/root/innovatehub-hub/image-generator/generated',
+  openaiKey: process.env.OPENAI_API_KEY,
+  replicateKey: process.env.REPLICATE_API_TOKEN,
+  stabilityKey: process.env.STABILITY_API_KEY
+});
+
+// Generate single image
+app.post('/api/images/generate', async (req, res) => {
+  try {
+    const {
+      prompt,
+      template,
+      brand = 'platapay',
+      style,
+      provider = 'pollinations',
+      model,
+      width,
+      height,
+      negative_prompt,
+      seed,
+      enhance = true,
+      save = true
+    } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: 'prompt is required' });
+    }
+
+    const result = await imageGenerator.generate({
+      prompt,
+      template,
+      brand,
+      style,
+      provider,
+      model,
+      width,
+      height,
+      negative_prompt,
+      seed,
+      enhance,
+      save
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[ImageGen] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate multiple variations
+app.post('/api/images/variations', async (req, res) => {
+  try {
+    const { count = 4, ...options } = req.body;
+
+    if (!options.prompt) {
+      return res.status(400).json({ error: 'prompt is required' });
+    }
+
+    const results = await imageGenerator.generateVariations(options, count);
+    res.json({ success: true, count: results.length, images: results });
+  } catch (error) {
+    console.error('[ImageGen] Variations error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate campaign assets for multiple platforms
+app.post('/api/images/campaign', async (req, res) => {
+  try {
+    const {
+      name,
+      prompt,
+      brand = 'platapay',
+      platforms = ['facebook_ad', 'instagram_post', 'instagram_story'],
+      style,
+      provider = 'pollinations'
+    } = req.body;
+
+    if (!name || !prompt) {
+      return res.status(400).json({ error: 'name and prompt are required' });
+    }
+
+    const result = await imageGenerator.generateCampaign({
+      name,
+      prompt,
+      brand,
+      platforms: Array.isArray(platforms) ? platforms : platforms.split(','),
+      style,
+      provider
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[ImageGen] Campaign error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate agent profile image
+app.post('/api/images/agent-profile', async (req, res) => {
+  try {
+    const {
+      gender = 'neutral',
+      age = 'young adult',
+      expression = 'friendly professional smile',
+      attire = 'business casual polo shirt',
+      background = 'clean office'
+    } = req.body;
+
+    const result = await imageGenerator.generateAgentProfile({
+      gender,
+      age,
+      expression,
+      attire,
+      background
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[ImageGen] Agent profile error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate branch/kiosk location image
+app.post('/api/images/branch', async (req, res) => {
+  try {
+    const {
+      locationType = 'mall kiosk',
+      setting = 'Philippine shopping mall',
+      timeOfDay = 'daytime',
+      features = 'digital payment terminal, LED signage'
+    } = req.body;
+
+    const result = await imageGenerator.generateBranchImage({
+      locationType,
+      setting,
+      timeOfDay,
+      features
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[ImageGen] Branch image error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate product mockup
+app.post('/api/images/product', async (req, res) => {
+  try {
+    const {
+      productName,
+      description,
+      category = 'fintech app',
+      mockupType = 'product_shot',
+      brand = 'platapay'
+    } = req.body;
+
+    if (!productName || !description) {
+      return res.status(400).json({ error: 'productName and description are required' });
+    }
+
+    const result = await imageGenerator.generateProductMockup({
+      productName,
+      description,
+      category,
+      mockupType,
+      brand
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[ImageGen] Product mockup error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get available templates, styles, providers
+app.get('/api/images/templates', (req, res) => {
+  res.json({
+    templates: ImageGenerator.getTemplates(),
+    count: Object.keys(ImageGenerator.getTemplates()).length
+  });
+});
+
+app.get('/api/images/styles', (req, res) => {
+  res.json({
+    styles: ImageGenerator.getStyles(),
+    count: Object.keys(ImageGenerator.getStyles()).length
+  });
+});
+
+app.get('/api/images/brands', (req, res) => {
+  res.json({
+    brands: ImageGenerator.getBrands(),
+    count: Object.keys(ImageGenerator.getBrands()).length
+  });
+});
+
+app.get('/api/images/providers', (req, res) => {
+  res.json({
+    providers: ImageGenerator.getProviders(),
+    count: Object.keys(ImageGenerator.getProviders()).length
+  });
+});
+
+// Quick generate with presets
+app.get('/api/images/quick/:type', async (req, res) => {
+  try {
+    const { type } = req.params;
+    const { prompt = 'PlataPay digital payment solution' } = req.query;
+
+    let result;
+    switch (type) {
+      case 'facebook':
+        result = await imageGenerator.generate({
+          prompt,
+          template: 'facebook_ad',
+          brand: 'platapay',
+          style: 'corporate'
+        });
+        break;
+      case 'instagram':
+        result = await imageGenerator.generate({
+          prompt,
+          template: 'instagram_post',
+          brand: 'platapay',
+          style: 'corporate'
+        });
+        break;
+      case 'story':
+        result = await imageGenerator.generate({
+          prompt,
+          template: 'instagram_story',
+          brand: 'platapay',
+          style: 'corporate'
+        });
+        break;
+      case 'banner':
+        result = await imageGenerator.generate({
+          prompt,
+          template: 'hero_banner',
+          brand: 'innovatehub',
+          style: 'corporate'
+        });
+        break;
+      case 'email':
+        result = await imageGenerator.generate({
+          prompt,
+          template: 'email_header',
+          brand: 'platapay',
+          style: 'corporate'
+        });
+        break;
+      default:
+        return res.status(400).json({ 
+          error: 'Unknown type. Use: facebook, instagram, story, banner, email' 
+        });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('[ImageGen] Quick generate error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // =============================================================================

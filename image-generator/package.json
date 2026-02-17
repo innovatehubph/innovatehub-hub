@@ -1,0 +1,27 @@
+{
+  "name": "@innovatehub/image-generator",
+  "version": "1.0.0",
+  "description": "AI-powered image generation for InnovateHub/PlataPay marketing",
+  "main": "index.js",
+  "bin": {
+    "ih-imagine": "./cli.js"
+  },
+  "scripts": {
+    "test": "node test.js",
+    "cli": "node cli.js"
+  },
+  "keywords": [
+    "ai",
+    "image-generation",
+    "marketing",
+    "fintech",
+    "platapay",
+    "innovatehub"
+  ],
+  "author": "InnovateHub Inc",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "yargs": "^17.7.2"
+  }
+}
