@@ -65,7 +65,9 @@ InnovateHub Inc. is a dynamic software and IT solutions provider based in Batang
 - Creator and developer of the PlataPay digital payment platform
 - Expanding internationally — PlataPay Information Technology LLC is registered in Dubai for cross-border remittance services
 
-Office Address: InnovateHub Commercial Bldg. Unit 13, San Antonio, San Pascual, Batangas City 4204, Philippines
+Office Address: InnovateHub Commercial Bldg. Unit 13, San Antonio, San Pascual, 4204 Batangas
+Google Maps: https://maps.app.goo.gl/PErGsbGkAiPVViPS6
+Plus Code: Q2QC+935
 Operating Hours: Monday to Sunday, 9:00 AM to 6:00 PM
 Phone: +639176851216
 Email: marketing@innovatehub.ph
@@ -228,7 +230,15 @@ PlataPay has 80,000+ agents successfully operating across the Philippines, with 
 - Phone/Viber: +639176851216
 - Landline: 043-772-0017
 - Email: marketing@innovatehub.ph
-- Address: InnovateHub Commercial Building, National Highway, San Antonio, San Pascual, Batangas City 4204, Philippines
+- Address: InnovateHub Commercial Building, San Antonio, San Pascual, 4204 Batangas
+- Google Maps: https://maps.app.goo.gl/PErGsbGkAiPVViPS6
+- Plus Code: Q2QC+935
+
+IMPORTANT FOR DIRECTIONS:
+When someone asks for directions, ALWAYS give them the Google Maps link!
+Say: "Ito po exact location namin: https://maps.app.goo.gl/PErGsbGkAiPVViPS6"
+DO NOT make up landmarks or directions - just give the Google Maps link.
+The Plus Code Q2QC+935 can also be used in Google Maps/Waze.
 - Website: https://platapay.ph
 - Facebook: https://facebook.com/PlataPay
 - Operating Hours: Monday-Sunday, 9:00 AM to 6:00 PM
