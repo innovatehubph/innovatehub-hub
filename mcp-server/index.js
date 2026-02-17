@@ -905,6 +905,252 @@ server.resource(
   }
 );
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TIER 5: Competitive Intelligence & Predictive Analytics Tools
+// ═══════════════════════════════════════════════════════════════════════════
+
+// 30. add_competitor
+server.tool(
+  'add_competitor',
+  'Add a competitor for monitoring',
+  {
+    name: z.string().describe('Competitor company name'),
+    facebookPageId: z.string().optional().describe('Facebook Page ID'),
+    facebookPageName: z.string().optional().describe('Facebook Page name'),
+    website: z.string().optional().describe('Competitor website URL'),
+    keywords: z.array(z.string()).optional().describe('Keywords to track'),
+  },
+  async ({ name, facebookPageId, facebookPageName, website, keywords }) => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/competitors`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, facebookPageId, facebookPageName, website, keywords })
+      });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 31. list_competitors
+server.tool(
+  'list_competitors',
+  'List all monitored competitors',
+  {},
+  async () => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/competitors`);
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 32. add_competitor_ad
+server.tool(
+  'add_competitor_ad',
+  'Add a competitor ad for analysis',
+  {
+    competitorId: z.string().describe('Competitor objectId'),
+    platform: z.string().optional().describe('Platform (facebook, instagram, etc.)'),
+    adType: z.string().optional().describe('Ad type (image, video, carousel)'),
+    headline: z.string().optional().describe('Ad headline'),
+    bodyText: z.string().optional().describe('Ad body text'),
+    ctaText: z.string().optional().describe('Call-to-action text'),
+    landingUrl: z.string().optional().describe('Landing page URL'),
+    imageUrl: z.string().optional().describe('Ad image URL'),
+  },
+  async (params) => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/competitor-ads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+      });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 33. analyze_competitor_ad
+server.tool(
+  'analyze_competitor_ad',
+  'Run AI analysis on a competitor ad',
+  {
+    adId: z.string().describe('CompetitorAd objectId'),
+  },
+  async ({ adId }) => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/competitor-ads/${adId}/analyze`, {
+        method: 'POST'
+      });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 34. get_competitive_report
+server.tool(
+  'get_competitive_report',
+  'Generate a competitive intelligence report',
+  {
+    days: z.number().optional().describe('Days to analyze (default 30)'),
+  },
+  async ({ days }) => {
+    try {
+      const url = days 
+        ? `${WEBHOOK_SERVER_URL}/api/competitive-report?days=${days}`
+        : `${WEBHOOK_SERVER_URL}/api/competitive-report`;
+      const res = await fetch(url);
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 35. get_historical_analytics
+server.tool(
+  'get_historical_analytics',
+  'Get historical performance data for a metric',
+  {
+    metric: z.enum(['leads', 'emails', 'conversations', 'messages']).describe('Metric to analyze'),
+    days: z.number().optional().describe('Days to look back (default 30)'),
+  },
+  async ({ metric, days }) => {
+    try {
+      const params = new URLSearchParams({ metric });
+      if (days) params.set('days', String(days));
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/analytics/historical?${params}`);
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 36. detect_creative_fatigue
+server.tool(
+  'detect_creative_fatigue',
+  'Detect creative/message fatigue across bot flows and emails',
+  {
+    days: z.number().optional().describe('Days to analyze (default 14)'),
+  },
+  async ({ days }) => {
+    try {
+      const url = days 
+        ? `${WEBHOOK_SERVER_URL}/api/analytics/fatigue-detection?days=${days}`
+        : `${WEBHOOK_SERVER_URL}/api/analytics/fatigue-detection`;
+      const res = await fetch(url);
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 37. get_performance_forecast
+server.tool(
+  'get_performance_forecast',
+  'Get performance predictions for the next N days',
+  {
+    metric: z.enum(['leads', 'emails']).optional().describe('Metric to forecast (default: leads)'),
+    forecastDays: z.number().optional().describe('Days to forecast (default 7)'),
+  },
+  async ({ metric, forecastDays }) => {
+    try {
+      const params = new URLSearchParams();
+      if (metric) params.set('metric', metric);
+      if (forecastDays) params.set('forecastDays', String(forecastDays));
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/analytics/forecast?${params}`);
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 38. get_budget_optimization
+server.tool(
+  'get_budget_optimization',
+  'Get budget optimization recommendations based on source performance',
+  {
+    days: z.number().optional().describe('Days to analyze (default 30)'),
+  },
+  async ({ days }) => {
+    try {
+      const url = days 
+        ? `${WEBHOOK_SERVER_URL}/api/analytics/budget-optimization?days=${days}`
+        : `${WEBHOOK_SERVER_URL}/api/analytics/budget-optimization`;
+      const res = await fetch(url);
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Resources: Competitive & Predictive
+// ═══════════════════════════════════════════════════════════════════════════
+
+// 6. Competitive Intelligence
+server.resource(
+  'competitive-intelligence',
+  'innovatehub://competitive-intelligence',
+  { description: 'Competitor tracking and market insights' },
+  async () => {
+    let data = {};
+    try {
+      const [competitors, report] = await Promise.all([
+        fetch(`${WEBHOOK_SERVER_URL}/api/competitors`).then(r => r.json()),
+        fetch(`${WEBHOOK_SERVER_URL}/api/competitive-report?days=30`).then(r => r.json())
+      ]);
+      data = { competitors: competitors.competitors, report };
+    } catch (err) {
+      data = { error: err.message };
+    }
+    return { contents: [{ uri: 'innovatehub://competitive-intelligence', text: JSON.stringify(data, null, 2), mimeType: 'application/json' }] };
+  }
+);
+
+// 7. Performance Forecast
+server.resource(
+  'performance-forecast',
+  'innovatehub://performance-forecast',
+  { description: 'Lead forecast and trend analysis' },
+  async () => {
+    let data = {};
+    try {
+      const [forecast, fatigue, budget] = await Promise.all([
+        fetch(`${WEBHOOK_SERVER_URL}/api/analytics/forecast`).then(r => r.json()),
+        fetch(`${WEBHOOK_SERVER_URL}/api/analytics/fatigue-detection`).then(r => r.json()),
+        fetch(`${WEBHOOK_SERVER_URL}/api/analytics/budget-optimization`).then(r => r.json())
+      ]);
+      data = { forecast, fatigue, budgetOptimization: budget };
+    } catch (err) {
+      data = { error: err.message };
+    }
+    return { contents: [{ uri: 'innovatehub://performance-forecast', text: JSON.stringify(data, null, 2), mimeType: 'application/json' }] };
+  }
+);
+
 // ─── Start ───
 
 const transport = new StdioServerTransport();

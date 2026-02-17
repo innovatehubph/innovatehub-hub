@@ -3928,6 +3928,739 @@ async function processScheduledActions() {
 }
 
 // =============================================================================
+// TIER 5 #19: Competitive Intelligence
+// =============================================================================
+
+const FB_ADS_LIBRARY_URL = 'https://www.facebook.com/ads/library/api';
+
+// Fetch ads from Facebook Ads Library (public API)
+async function fetchAdsLibrary({ searchTerms, adType = 'ALL', country = 'PH', limit = 50 }) {
+  try {
+    // Facebook Ads Library API endpoint
+    const params = new URLSearchParams({
+      ad_type: adType,
+      countries: country,
+      search_terms: searchTerms,
+      limit: String(limit),
+      fields: 'id,ad_creative_link_titles,ad_creative_bodies,ad_delivery_start_time,ad_delivery_stop_time,page_id,page_name,publisher_platforms,impressions,spend',
+    });
+
+    // Note: Full Ads Library API requires access token with ads_read permission
+    // For now, we'll scrape public data or use stored competitor data
+    console.log(`[AdsLibrary] Searching for: ${searchTerms}`);
+    
+    // Return placeholder - in production, implement actual API call
+    return {
+      searchTerms,
+      country,
+      note: 'Full implementation requires Facebook Marketing API access token',
+      timestamp: new Date().toISOString()
+    };
+  } catch (err) {
+    console.error('[AdsLibrary] Fetch error:', err.message);
+    return { error: err.message };
+  }
+}
+
+// Store competitor for monitoring
+app.post('/api/competitors', async (req, res) => {
+  try {
+    const { name, facebookPageId, facebookPageName, website, keywords, industry } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+
+    const competitor = new Parse.Object('Competitor');
+    competitor.set('name', name);
+    competitor.set('facebookPageId', facebookPageId || '');
+    competitor.set('facebookPageName', facebookPageName || '');
+    competitor.set('website', website || '');
+    competitor.set('keywords', keywords || []);
+    competitor.set('industry', industry || 'fintech');
+    competitor.set('isActive', true);
+    competitor.set('lastScannedAt', null);
+    await competitor.save(null, { useMasterKey: true });
+
+    console.log(`[Competitor] Added: ${name}`);
+    res.json({ success: true, competitorId: competitor.id, name });
+  } catch (err) {
+    console.error('[API] add competitor error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// List competitors
+app.get('/api/competitors', async (req, res) => {
+  try {
+    const query = new Parse.Query('Competitor');
+    query.equalTo('isActive', true);
+    const competitors = await query.find({ useMasterKey: true });
+
+    const result = competitors.map(c => ({
+      id: c.id,
+      name: c.get('name'),
+      facebookPageId: c.get('facebookPageId'),
+      facebookPageName: c.get('facebookPageName'),
+      website: c.get('website'),
+      keywords: c.get('keywords'),
+      industry: c.get('industry'),
+      lastScannedAt: c.get('lastScannedAt'),
+      createdAt: c.get('createdAt')
+    }));
+
+    res.json({ count: result.length, competitors: result });
+  } catch (err) {
+    console.error('[API] list competitors error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Store competitor ad for analysis
+app.post('/api/competitor-ads', async (req, res) => {
+  try {
+    const { competitorId, adId, platform, adType, headline, bodyText, imageUrl, videoUrl, ctaText, landingUrl, startDate, endDate, estimatedSpend, estimatedImpressions } = req.body;
+    if (!competitorId) {
+      return res.status(400).json({ error: 'competitorId is required' });
+    }
+
+    const ad = new Parse.Object('CompetitorAd');
+    const competitor = new Parse.Object('Competitor');
+    competitor.id = competitorId;
+    
+    ad.set('competitor', competitor);
+    ad.set('adId', adId || `manual_${Date.now()}`);
+    ad.set('platform', platform || 'facebook');
+    ad.set('adType', adType || 'image');
+    ad.set('headline', headline || '');
+    ad.set('bodyText', bodyText || '');
+    ad.set('imageUrl', imageUrl || '');
+    ad.set('videoUrl', videoUrl || '');
+    ad.set('ctaText', ctaText || '');
+    ad.set('landingUrl', landingUrl || '');
+    ad.set('startDate', startDate ? new Date(startDate) : null);
+    ad.set('endDate', endDate ? new Date(endDate) : null);
+    ad.set('estimatedSpend', estimatedSpend || null);
+    ad.set('estimatedImpressions', estimatedImpressions || null);
+    ad.set('analyzedAt', null);
+    ad.set('aiAnalysis', null);
+    await ad.save(null, { useMasterKey: true });
+
+    console.log(`[CompetitorAd] Added ad for competitor ${competitorId}`);
+    res.json({ success: true, adId: ad.id });
+  } catch (err) {
+    console.error('[API] add competitor ad error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get competitor ads with optional filtering
+app.get('/api/competitor-ads', async (req, res) => {
+  try {
+    const { competitorId, platform, limit = 50 } = req.query;
+    
+    const query = new Parse.Query('CompetitorAd');
+    if (competitorId) {
+      const competitor = new Parse.Object('Competitor');
+      competitor.id = competitorId;
+      query.equalTo('competitor', competitor);
+    }
+    if (platform) {
+      query.equalTo('platform', platform);
+    }
+    query.descending('createdAt');
+    query.limit(parseInt(limit));
+    query.include('competitor');
+    
+    const ads = await query.find({ useMasterKey: true });
+
+    const result = ads.map(a => ({
+      id: a.id,
+      competitorName: a.get('competitor')?.get('name') || 'Unknown',
+      platform: a.get('platform'),
+      adType: a.get('adType'),
+      headline: a.get('headline'),
+      bodyText: a.get('bodyText'),
+      imageUrl: a.get('imageUrl'),
+      ctaText: a.get('ctaText'),
+      landingUrl: a.get('landingUrl'),
+      startDate: a.get('startDate'),
+      aiAnalysis: a.get('aiAnalysis'),
+      createdAt: a.get('createdAt')
+    }));
+
+    res.json({ count: result.length, ads: result });
+  } catch (err) {
+    console.error('[API] list competitor ads error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// AI-powered competitor ad analysis
+app.post('/api/competitor-ads/:id/analyze', async (req, res) => {
+  try {
+    const ad = await new Parse.Query('CompetitorAd').include('competitor').get(req.params.id, { useMasterKey: true });
+    
+    const competitorName = ad.get('competitor')?.get('name') || 'Unknown';
+    const headline = ad.get('headline') || '';
+    const bodyText = ad.get('bodyText') || '';
+    const ctaText = ad.get('ctaText') || '';
+    const platform = ad.get('platform') || 'facebook';
+
+    // Build analysis prompt
+    const analysisPrompt = `Analyze this competitor ad from ${competitorName} (${platform}):
+
+HEADLINE: ${headline}
+BODY: ${bodyText}
+CTA: ${ctaText}
+
+Provide analysis in JSON format:
+{
+  "targetAudience": "who this ad targets",
+  "keyMessages": ["message1", "message2"],
+  "emotionalAppeals": ["appeal1", "appeal2"],
+  "uniqueSellingPoints": ["usp1", "usp2"],
+  "callToActionStrength": "weak/medium/strong",
+  "estimatedObjective": "awareness/consideration/conversion",
+  "competitiveThreats": ["threat1", "threat2"],
+  "opportunities": ["opportunity1", "opportunity2"],
+  "recommendedCounterStrategy": "brief strategy recommendation"
+}`;
+
+    // Call AI proxy for analysis
+    const aiResponse = await fetch(`${AI_PROXY_URL}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': AI_API_SECRET
+      },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: analysisPrompt }],
+        businessContext: 'Competitor ad analysis for PlataPay marketing team'
+      })
+    });
+
+    let analysis = null;
+    if (aiResponse.ok) {
+      const aiData = await aiResponse.json();
+      const responseText = aiData.response || '';
+      
+      // Try to extract JSON from response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          analysis = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          analysis = { rawAnalysis: responseText };
+        }
+      } else {
+        analysis = { rawAnalysis: responseText };
+      }
+    }
+
+    ad.set('aiAnalysis', analysis);
+    ad.set('analyzedAt', new Date());
+    await ad.save(null, { useMasterKey: true });
+
+    console.log(`[CompetitorAd] Analyzed ad ${req.params.id}`);
+    res.json({ success: true, adId: req.params.id, analysis });
+  } catch (err) {
+    console.error('[API] analyze competitor ad error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate competitive intelligence report
+app.get('/api/competitive-report', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const since = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
+
+    // Get all competitors
+    const compQuery = new Parse.Query('Competitor');
+    compQuery.equalTo('isActive', true);
+    const competitors = await compQuery.find({ useMasterKey: true });
+
+    // Get recent competitor ads
+    const adQuery = new Parse.Query('CompetitorAd');
+    adQuery.greaterThan('createdAt', since);
+    adQuery.include('competitor');
+    const ads = await adQuery.find({ useMasterKey: true });
+
+    // Aggregate insights
+    const competitorStats = {};
+    const allMessages = [];
+    const allUSPs = [];
+    const allThreats = [];
+
+    ads.forEach(ad => {
+      const compName = ad.get('competitor')?.get('name') || 'Unknown';
+      if (!competitorStats[compName]) {
+        competitorStats[compName] = { adCount: 0, platforms: new Set(), analyzed: 0 };
+      }
+      competitorStats[compName].adCount++;
+      competitorStats[compName].platforms.add(ad.get('platform'));
+      
+      const analysis = ad.get('aiAnalysis');
+      if (analysis) {
+        competitorStats[compName].analyzed++;
+        if (analysis.keyMessages) allMessages.push(...analysis.keyMessages);
+        if (analysis.uniqueSellingPoints) allUSPs.push(...analysis.uniqueSellingPoints);
+        if (analysis.competitiveThreats) allThreats.push(...analysis.competitiveThreats);
+      }
+    });
+
+    // Convert Sets to arrays
+    Object.keys(competitorStats).forEach(k => {
+      competitorStats[k].platforms = [...competitorStats[k].platforms];
+    });
+
+    // Count message frequency
+    const messageCounts = {};
+    allMessages.forEach(m => {
+      const key = m.toLowerCase().trim();
+      messageCounts[key] = (messageCounts[key] || 0) + 1;
+    });
+
+    const report = {
+      period: `${days} days`,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalCompetitors: competitors.length,
+        totalAdsTracked: ads.length,
+        adsAnalyzed: ads.filter(a => a.get('aiAnalysis')).length
+      },
+      competitorBreakdown: competitorStats,
+      topCompetitorMessages: Object.entries(messageCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([message, count]) => ({ message, count })),
+      identifiedThreats: [...new Set(allThreats)].slice(0, 10),
+      recommendations: [
+        'Monitor competitor ad frequency for market activity signals',
+        'Analyze high-performing competitor CTAs for inspiration',
+        'Track competitor landing page changes for offer insights',
+        'Watch for new competitor entrants in the agent recruitment space'
+      ]
+    };
+
+    res.json(report);
+  } catch (err) {
+    console.error('[API] competitive report error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =============================================================================
+// TIER 5 #20: Predictive Performance Analytics
+// =============================================================================
+
+// Get historical performance data
+app.get('/api/analytics/historical', async (req, res) => {
+  try {
+    const { days = 30, metric = 'leads' } = req.query;
+    const daysNum = parseInt(days);
+    
+    const dailyData = [];
+    
+    for (let i = daysNum - 1; i >= 0; i--) {
+      const dayStart = new Date();
+      dayStart.setDate(dayStart.getDate() - i);
+      dayStart.setHours(0, 0, 0, 0);
+      
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      let count = 0;
+      
+      if (metric === 'leads') {
+        const query = new Parse.Query('FbLead');
+        query.greaterThanOrEqualTo('createdAt', dayStart);
+        query.lessThanOrEqualTo('createdAt', dayEnd);
+        count = await query.count({ useMasterKey: true });
+      } else if (metric === 'emails') {
+        const query = new Parse.Query('EmailLog');
+        query.greaterThanOrEqualTo('sentAt', dayStart);
+        query.lessThanOrEqualTo('sentAt', dayEnd);
+        query.equalTo('status', 'sent');
+        count = await query.count({ useMasterKey: true });
+      } else if (metric === 'conversations') {
+        const query = new Parse.Query('Conversation');
+        query.greaterThanOrEqualTo('createdAt', dayStart);
+        query.lessThanOrEqualTo('createdAt', dayEnd);
+        count = await query.count({ useMasterKey: true });
+      } else if (metric === 'messages') {
+        const query = new Parse.Query('Message');
+        query.greaterThanOrEqualTo('timestamp', dayStart);
+        query.lessThanOrEqualTo('timestamp', dayEnd);
+        query.equalTo('direction', 'inbound');
+        count = await query.count({ useMasterKey: true });
+      }
+
+      dailyData.push({
+        date: dayStart.toISOString().substring(0, 10),
+        value: count
+      });
+    }
+
+    // Calculate statistics
+    const values = dailyData.map(d => d.value);
+    const sum = values.reduce((a, b) => a + b, 0);
+    const avg = sum / values.length;
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    
+    // Simple trend calculation (linear regression slope)
+    const n = values.length;
+    const sumX = (n * (n - 1)) / 2;
+    const sumY = sum;
+    const sumXY = values.reduce((acc, y, x) => acc + x * y, 0);
+    const sumX2 = (n * (n - 1) * (2 * n - 1)) / 6;
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    
+    const trend = slope > 0.5 ? 'increasing' : slope < -0.5 ? 'decreasing' : 'stable';
+
+    res.json({
+      metric,
+      period: `${daysNum} days`,
+      data: dailyData,
+      statistics: {
+        total: sum,
+        average: Math.round(avg * 100) / 100,
+        max,
+        min,
+        trend,
+        trendSlope: Math.round(slope * 1000) / 1000
+      }
+    });
+  } catch (err) {
+    console.error('[API] historical analytics error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Detect creative/message fatigue
+app.get('/api/analytics/fatigue-detection', async (req, res) => {
+  try {
+    const { days = 14 } = req.query;
+    const since = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
+    const midpoint = new Date(Date.now() - (parseInt(days) / 2) * 24 * 60 * 60 * 1000);
+
+    // Analyze bot flow performance over time
+    const flowQuery = new Parse.Query('BotFlow');
+    flowQuery.equalTo('isActive', true);
+    const flows = await flowQuery.find({ useMasterKey: true });
+
+    const fatigueIndicators = [];
+
+    for (const flow of flows) {
+      // Get messages triggered by this flow in first half
+      const firstHalfQuery = new Parse.Query('Message');
+      firstHalfQuery.equalTo('botFlowId', flow.id);
+      firstHalfQuery.greaterThan('timestamp', since);
+      firstHalfQuery.lessThan('timestamp', midpoint);
+      const firstHalfCount = await firstHalfQuery.count({ useMasterKey: true });
+
+      // Get messages in second half
+      const secondHalfQuery = new Parse.Query('Message');
+      secondHalfQuery.equalTo('botFlowId', flow.id);
+      secondHalfQuery.greaterThanOrEqualTo('timestamp', midpoint);
+      const secondHalfCount = await secondHalfQuery.count({ useMasterKey: true });
+
+      // Calculate engagement change
+      const changePercent = firstHalfCount > 0 
+        ? ((secondHalfCount - firstHalfCount) / firstHalfCount) * 100 
+        : 0;
+
+      // Flag if engagement dropped significantly
+      if (firstHalfCount > 10 && changePercent < -20) {
+        fatigueIndicators.push({
+          type: 'bot_flow',
+          id: flow.id,
+          name: flow.get('name'),
+          firstHalfEngagement: firstHalfCount,
+          secondHalfEngagement: secondHalfCount,
+          changePercent: Math.round(changePercent),
+          severity: changePercent < -50 ? 'high' : 'medium',
+          recommendation: 'Consider refreshing bot flow messages or A/B testing new variants'
+        });
+      }
+    }
+
+    // Analyze email template performance
+    const emailQuery = new Parse.Query('EmailLog');
+    emailQuery.greaterThan('sentAt', since);
+    emailQuery.equalTo('status', 'sent');
+    const emails = await emailQuery.find({ useMasterKey: true });
+
+    const templateStats = {};
+    emails.forEach(e => {
+      const template = e.get('template') || 'unknown';
+      const sentAt = e.get('sentAt');
+      const isFirstHalf = sentAt < midpoint;
+      
+      if (!templateStats[template]) {
+        templateStats[template] = { firstHalf: 0, secondHalf: 0 };
+      }
+      if (isFirstHalf) {
+        templateStats[template].firstHalf++;
+      } else {
+        templateStats[template].secondHalf++;
+      }
+    });
+
+    // Check for declining template usage (might indicate lower engagement)
+    Object.entries(templateStats).forEach(([template, stats]) => {
+      if (stats.firstHalf > 10) {
+        const change = ((stats.secondHalf - stats.firstHalf) / stats.firstHalf) * 100;
+        if (change < -30) {
+          fatigueIndicators.push({
+            type: 'email_template',
+            template,
+            firstHalfSends: stats.firstHalf,
+            secondHalfSends: stats.secondHalf,
+            changePercent: Math.round(change),
+            severity: change < -50 ? 'high' : 'medium',
+            recommendation: 'Review email template performance and consider refreshing content'
+          });
+        }
+      }
+    });
+
+    res.json({
+      period: `${days} days`,
+      analyzedAt: new Date().toISOString(),
+      fatigueIndicators,
+      summary: {
+        totalIndicators: fatigueIndicators.length,
+        highSeverity: fatigueIndicators.filter(f => f.severity === 'high').length,
+        mediumSeverity: fatigueIndicators.filter(f => f.severity === 'medium').length
+      },
+      generalRecommendations: fatigueIndicators.length > 0 ? [
+        'Rotate creative assets every 2-3 weeks',
+        'Test new messaging angles with A/B tests',
+        'Segment audiences to reduce frequency per user',
+        'Update offers and CTAs periodically'
+      ] : ['No significant fatigue detected - maintain current creative rotation']
+    });
+  } catch (err) {
+    console.error('[API] fatigue detection error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Performance forecast
+app.get('/api/analytics/forecast', async (req, res) => {
+  try {
+    const { metric = 'leads', forecastDays = 7 } = req.query;
+    
+    // Get last 30 days of data for forecasting
+    const historicalDays = 30;
+    const dailyData = [];
+    
+    for (let i = historicalDays - 1; i >= 0; i--) {
+      const dayStart = new Date();
+      dayStart.setDate(dayStart.getDate() - i);
+      dayStart.setHours(0, 0, 0, 0);
+      
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      let count = 0;
+      
+      if (metric === 'leads') {
+        const query = new Parse.Query('FbLead');
+        query.greaterThanOrEqualTo('createdAt', dayStart);
+        query.lessThanOrEqualTo('createdAt', dayEnd);
+        count = await query.count({ useMasterKey: true });
+      } else if (metric === 'emails') {
+        const query = new Parse.Query('EmailLog');
+        query.greaterThanOrEqualTo('sentAt', dayStart);
+        query.lessThanOrEqualTo('sentAt', dayEnd);
+        query.equalTo('status', 'sent');
+        count = await query.count({ useMasterKey: true });
+      }
+
+      dailyData.push(count);
+    }
+
+    // Simple moving average forecast
+    const windowSize = 7;
+    const recentAvg = dailyData.slice(-windowSize).reduce((a, b) => a + b, 0) / windowSize;
+    
+    // Calculate trend
+    const firstWeekAvg = dailyData.slice(0, 7).reduce((a, b) => a + b, 0) / 7;
+    const lastWeekAvg = dailyData.slice(-7).reduce((a, b) => a + b, 0) / 7;
+    const weeklyTrend = firstWeekAvg > 0 ? (lastWeekAvg - firstWeekAvg) / firstWeekAvg : 0;
+    
+    // Generate forecast
+    const forecast = [];
+    let currentValue = recentAvg;
+    const dailyTrendFactor = 1 + (weeklyTrend / 7);
+
+    for (let i = 1; i <= parseInt(forecastDays); i++) {
+      const forecastDate = new Date();
+      forecastDate.setDate(forecastDate.getDate() + i);
+      
+      // Apply trend
+      currentValue *= dailyTrendFactor;
+      
+      // Add day-of-week seasonality (weekends typically lower)
+      const dayOfWeek = forecastDate.getDay();
+      const seasonalFactor = (dayOfWeek === 0 || dayOfWeek === 6) ? 0.7 : 1.1;
+      
+      const forecastValue = Math.round(currentValue * seasonalFactor);
+      
+      forecast.push({
+        date: forecastDate.toISOString().substring(0, 10),
+        predicted: Math.max(0, forecastValue),
+        confidence: 'medium'
+      });
+    }
+
+    // Calculate confidence interval
+    const stdDev = Math.sqrt(
+      dailyData.reduce((sum, val) => sum + Math.pow(val - recentAvg, 2), 0) / dailyData.length
+    );
+
+    res.json({
+      metric,
+      historicalDays,
+      forecastDays: parseInt(forecastDays),
+      generatedAt: new Date().toISOString(),
+      historical: {
+        average: Math.round(recentAvg * 100) / 100,
+        trend: weeklyTrend > 0.1 ? 'increasing' : weeklyTrend < -0.1 ? 'decreasing' : 'stable',
+        trendPercent: Math.round(weeklyTrend * 100),
+        standardDeviation: Math.round(stdDev * 100) / 100
+      },
+      forecast,
+      totalForecast: forecast.reduce((sum, f) => sum + f.predicted, 0),
+      methodology: 'Moving average with trend adjustment and day-of-week seasonality'
+    });
+  } catch (err) {
+    console.error('[API] forecast error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Budget optimization recommendations
+app.get('/api/analytics/budget-optimization', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const since = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
+
+    // Analyze lead sources and their conversion
+    const leadQuery = new Parse.Query('FbLead');
+    leadQuery.greaterThan('createdAt', since);
+    const leads = await leadQuery.find({ useMasterKey: true });
+
+    // Group by source/form
+    const sourceStats = {};
+    leads.forEach(lead => {
+      const formId = lead.get('formId') || 'organic';
+      const score = lead.get('leadScore') || 0;
+      const stage = lead.get('pipelineStage') || 'inquiry';
+      const isConverted = ['screening', 'training', 'onboarded'].includes(stage);
+      
+      if (!sourceStats[formId]) {
+        sourceStats[formId] = {
+          total: 0,
+          hotLeads: 0,
+          converted: 0,
+          totalScore: 0
+        };
+      }
+      
+      sourceStats[formId].total++;
+      sourceStats[formId].totalScore += score;
+      if (score >= 50) sourceStats[formId].hotLeads++;
+      if (isConverted) sourceStats[formId].converted++;
+    });
+
+    // Calculate efficiency scores
+    const sourceEfficiency = Object.entries(sourceStats).map(([source, stats]) => {
+      const avgScore = stats.total > 0 ? stats.totalScore / stats.total : 0;
+      const hotLeadRate = stats.total > 0 ? (stats.hotLeads / stats.total) * 100 : 0;
+      const conversionRate = stats.total > 0 ? (stats.converted / stats.total) * 100 : 0;
+      
+      // Composite efficiency score
+      const efficiencyScore = (avgScore * 0.3) + (hotLeadRate * 0.4) + (conversionRate * 0.3);
+      
+      return {
+        source,
+        totalLeads: stats.total,
+        hotLeads: stats.hotLeads,
+        converted: stats.converted,
+        avgScore: Math.round(avgScore),
+        hotLeadRate: Math.round(hotLeadRate * 10) / 10,
+        conversionRate: Math.round(conversionRate * 10) / 10,
+        efficiencyScore: Math.round(efficiencyScore * 10) / 10
+      };
+    }).sort((a, b) => b.efficiencyScore - a.efficiencyScore);
+
+    // Generate recommendations
+    const recommendations = [];
+    
+    if (sourceEfficiency.length > 1) {
+      const topSource = sourceEfficiency[0];
+      const bottomSource = sourceEfficiency[sourceEfficiency.length - 1];
+      
+      if (topSource.efficiencyScore > bottomSource.efficiencyScore * 1.5) {
+        recommendations.push({
+          type: 'reallocation',
+          priority: 'high',
+          action: `Consider shifting budget from "${bottomSource.source}" to "${topSource.source}"`,
+          reason: `${topSource.source} has ${Math.round(topSource.efficiencyScore / bottomSource.efficiencyScore)}x higher efficiency score`,
+          potentialImpact: 'Could improve overall lead quality by 20-30%'
+        });
+      }
+    }
+
+    // Check for sources with high volume but low conversion
+    sourceEfficiency.forEach(s => {
+      if (s.totalLeads > 20 && s.conversionRate < 5) {
+        recommendations.push({
+          type: 'optimization',
+          priority: 'medium',
+          action: `Optimize targeting for "${s.source}"`,
+          reason: `High volume (${s.totalLeads} leads) but low conversion (${s.conversionRate}%)`,
+          potentialImpact: 'Better targeting could improve conversion 2-3x'
+        });
+      }
+    });
+
+    // Check for sources with great conversion but low volume
+    sourceEfficiency.forEach(s => {
+      if (s.totalLeads < 10 && s.conversionRate > 20) {
+        recommendations.push({
+          type: 'scaling',
+          priority: 'high',
+          action: `Increase budget for "${s.source}"`,
+          reason: `High conversion (${s.conversionRate}%) but low volume (${s.totalLeads} leads)`,
+          potentialImpact: 'Scaling could significantly increase qualified leads'
+        });
+      }
+    });
+
+    res.json({
+      period: `${days} days`,
+      analyzedAt: new Date().toISOString(),
+      totalLeadsAnalyzed: leads.length,
+      sourcePerformance: sourceEfficiency,
+      recommendations,
+      summary: {
+        topPerformer: sourceEfficiency[0]?.source || 'N/A',
+        totalRecommendations: recommendations.length,
+        highPriority: recommendations.filter(r => r.priority === 'high').length
+      }
+    });
+  } catch (err) {
+    console.error('[API] budget optimization error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =============================================================================
 // Start Server + All Cron Jobs
 // =============================================================================
 
