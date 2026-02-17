@@ -1347,7 +1347,12 @@ async function generateAIResponse(business, conversation, contact, userMessage) 
 async function sendAIResponse(business, conversation, senderPsid, aiResponse) {
   const token = await getPageAccessToken(business);
   // Split on ||| for multi-message responses
-  const messages = aiResponse.split('|||').map(m => m.trim()).filter(m => m.length > 0);
+  // Split on ||| or double newlines, clean up each message
+  const messages = aiResponse
+    .replace(/\n\n+/g, '|||')  // Convert double newlines to separator
+    .split('|||')
+    .map(m => m.replace(/\n/g, ' ').trim())  // Remove single newlines, trim
+    .filter(m => m.length > 0 && m.length < 300);  // Filter empty and overly long
 
   for (const msgText of messages) {
     // Truncate to Messenger limit
