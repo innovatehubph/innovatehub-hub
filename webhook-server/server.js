@@ -1349,6 +1349,27 @@ async function sendAIResponse(business, conversation, senderPsid, aiResponse) {
   await conversation.save(null, { useMasterKey: true });
 }
 
+// Simple deduplication cache to prevent double-processing
+const processedMessages = new Map();
+const DEDUP_TTL_MS = 60000; // 1 minute TTL
+
+function isDuplicateMessage(mid) {
+  if (!mid) return false;
+  if (processedMessages.has(mid)) {
+    console.log(`[Dedup] Skipping duplicate message: ${mid}`);
+    return true;
+  }
+  processedMessages.set(mid, Date.now());
+  // Clean old entries periodically
+  if (processedMessages.size > 1000) {
+    const now = Date.now();
+    for (const [key, time] of processedMessages) {
+      if (now - time > DEDUP_TTL_MS) processedMessages.delete(key);
+    }
+  }
+  return false;
+}
+
 async function handleMessagingEvent(entry) {
   const pageId = entry.id;
   const business = await getBusinessByPageId(pageId);
@@ -1360,6 +1381,10 @@ async function handleMessagingEvent(entry) {
     try {
       const senderPsid = event.sender && event.sender.id;
       if (!senderPsid || senderPsid === pageId) continue;
+
+      // Skip duplicate messages (Facebook sometimes sends webhooks twice)
+      const mid = event.message?.mid || event.postback?.mid;
+      if (isDuplicateMessage(mid)) continue;
 
       const contact = await getOrCreateContact(business, senderPsid, 'messenger');
       const conversation = await getOrCreateConversation(business, contact, 'messenger');

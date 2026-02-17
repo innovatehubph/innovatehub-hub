@@ -20,11 +20,12 @@ app.use((req, res, next) => {
   next();
 });
 
-const CREDENTIALS_PATH = '/root/.claude/.credentials.json';
-const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages?beta=true';
-const REFRESH_URL = 'https://console.anthropic.com/v1/oauth/token';
 const PORT = 3456;
 const API_SECRET = 'innovatehub-ai-2026';
+
+// Use OpenRouter API (more reliable, already configured)
+const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions';
 
 // ─── Chat System Prompt ───
 const CHAT_SYSTEM_PROMPT = `You are the InnovateHub Business Hub AI Assistant, powered by Claude. You help users manage their Facebook Business integration, PlataPay fintech services, and Silvera e-commerce platform.
@@ -370,55 +371,29 @@ If creating a Back4App schema, include: "schema": { "className": "X", "fields": 
 The route and navItem fields are optional — only include them for new pages.`;
 }
 
-// ─── Token Management ───
-function loadCredentials() {
-  const raw = readFileSync(CREDENTIALS_PATH, 'utf-8');
-  return JSON.parse(raw).claudeAiOauth;
-}
-
-async function refreshToken(creds) {
-  console.log('[AI Proxy] Refreshing OAuth token...');
-  const res = await fetch(REFRESH_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: creds.refreshToken }),
-  });
-  if (!res.ok) throw new Error('Token refresh failed: ' + await res.text());
-  const data = await res.json();
-  const fullCreds = JSON.parse(readFileSync(CREDENTIALS_PATH, 'utf-8'));
-  fullCreds.claudeAiOauth.accessToken = data.access_token;
-  fullCreds.claudeAiOauth.refreshToken = data.refresh_token || creds.refreshToken;
-  fullCreds.claudeAiOauth.expiresAt = Date.now() + (data.expires_in * 1000);
-  writeFileSync(CREDENTIALS_PATH, JSON.stringify(fullCreds));
-  return fullCreds.claudeAiOauth;
-}
-
-async function getValidToken() {
-  let creds = loadCredentials();
-  if (creds.expiresAt < Date.now() + 300000) creds = await refreshToken(creds);
-  return creds.accessToken;
-}
-
+// ─── OpenRouter API Call ───
 async function callClaude(systemPrompt, messages, maxTokens = 4096) {
-  const token = await getValidToken();
-  const response = await fetch(ANTHROPIC_API, {
+  const response = await fetch(OPENROUTER_API, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'oauth-2025-04-20',
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'HTTP-Referer': 'https://innovatehub.ph',
+      'X-Title': 'InnovateHub AI Proxy',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'anthropic/claude-3.5-sonnet',
       max_tokens: maxTokens,
-      system: systemPrompt,
-      messages,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages
+      ],
     }),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error?.message || 'AI request failed');
-  return data.content?.[0]?.text || '';
+  if (!response.ok) throw new Error(data.error?.message || JSON.stringify(data.error) || 'AI request failed');
+  // OpenRouter uses OpenAI format
+  return data.choices?.[0]?.message?.content || data.content?.[0]?.text || '';
 }
 
 // ─── Auth Middleware ───
