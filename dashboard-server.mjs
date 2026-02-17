@@ -19,7 +19,8 @@ const app = express();
 app.use(express.static(DIST_DIR));
 
 // SPA fallback — all routes serve index.html (HashRouter handles client-side routing)
-app.get('*', (req, res) => {
+// Use regex pattern for Express 5 compatibility
+app.get(/(.*)/, (req, res) => {
   res.sendFile(join(DIST_DIR, 'index.html'));
 });
 

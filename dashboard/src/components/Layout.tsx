@@ -27,6 +27,7 @@ const navItems = [
   { path: '/webhooks', label: 'Webhook Logs', icon: Webhook },
   { path: '/users', label: 'Users & Roles', icon: Users },
   { path: '/facebook-setup', label: 'Facebook Setup', icon: Facebook },
+  { path: '/facebook-apps', label: 'Facebook Apps', icon: Facebook },
   { path: '/image-generator', label: 'Image Generator', icon: ImagePlus },
   { path: '/ai-workshop', label: 'AI Workshop', icon: Wand2 },
   { path: '/settings', label: 'Settings', icon: Settings },

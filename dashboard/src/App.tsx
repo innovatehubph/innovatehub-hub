@@ -23,6 +23,7 @@ import AgentPipeline from './pages/AgentPipeline'
 import CompetitiveIntel from './pages/CompetitiveIntel'
 import PredictiveAnalytics from './pages/PredictiveAnalytics'
 import ImageGenerator from './pages/ImageGenerator'
+import FacebookApps from './pages/FacebookApps'
 
 export default function App() {
   const [activeBusiness, setActiveBusiness] = useState('')
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/webhooks" element={<WebhookLogs businessId={activeBusiness} />} />
         <Route path="/users" element={<Users businessId={activeBusiness} />} />
         <Route path="/facebook-setup" element={<FacebookSetup businessId={activeBusiness} />} />
+        <Route path="/facebook-apps" element={<FacebookApps />} />
         <Route path="/lead-magnets" element={<LeadMagnets businessId={activeBusiness} />} />
         <Route path="/nurture-sequences" element={<NurtureSequences businessId={activeBusiness} />} />
         <Route path="/agent-pipeline" element={<AgentPipeline businessId={activeBusiness} />} />

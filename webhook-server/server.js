@@ -5378,6 +5378,478 @@ app.get('/api/platapay/quick/:scene', async (req, res) => {
 });
 
 // =============================================================================
+// Facebook App Management APIs
+// =============================================================================
+
+// List all configured Facebook Apps
+app.get('/api/facebook-apps', async (req, res) => {
+  try {
+    const { businessId } = req.query;
+    const query = new Parse.Query('FacebookApp');
+    if (businessId) {
+      const businessPtr = new Parse.Object('Business');
+      businessPtr.id = businessId;
+      query.equalTo('business', businessPtr);
+    }
+    query.include('business');
+    query.descending('createdAt');
+    const apps = await query.find({ useMasterKey: true });
+    
+    const result = apps.map(app => ({
+      objectId: app.id,
+      appId: app.get('appId'),
+      appName: app.get('appName'),
+      pageId: app.get('pageId'),
+      pageName: app.get('pageName'),
+      webhookUrl: app.get('webhookUrl'),
+      verifyToken: app.get('verifyToken'),
+      status: app.get('status'),
+      permissions: app.get('permissions') || [],
+      lastVerified: app.get('lastVerified'),
+      createdAt: app.createdAt,
+      business: app.get('business') ? {
+        objectId: app.get('business').id,
+        name: app.get('business').get('name')
+      } : null
+    }));
+    
+    res.json({ success: true, apps: result });
+  } catch (err) {
+    console.error('[FacebookApps] List error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get single Facebook App
+app.get('/api/facebook-apps/:id', async (req, res) => {
+  try {
+    const query = new Parse.Query('FacebookApp');
+    query.include('business');
+    const app = await query.get(req.params.id, { useMasterKey: true });
+    
+    res.json({
+      success: true,
+      app: {
+        objectId: app.id,
+        appId: app.get('appId'),
+        appName: app.get('appName'),
+        pageId: app.get('pageId'),
+        pageName: app.get('pageName'),
+        webhookUrl: app.get('webhookUrl'),
+        verifyToken: app.get('verifyToken'),
+        status: app.get('status'),
+        permissions: app.get('permissions') || [],
+        lastVerified: app.get('lastVerified'),
+        createdAt: app.createdAt,
+        business: app.get('business') ? {
+          objectId: app.get('business').id,
+          name: app.get('business').get('name')
+        } : null
+      }
+    });
+  } catch (err) {
+    console.error('[FacebookApps] Get error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create Facebook App record
+app.post('/api/facebook-apps', async (req, res) => {
+  try {
+    const { businessId, appId, appName, pageId, pageName, webhookUrl, verifyToken, permissions } = req.body;
+    
+    if (!businessId || !appId || !pageId) {
+      return res.status(400).json({ error: 'businessId, appId, and pageId are required' });
+    }
+    
+    const businessPtr = new Parse.Object('Business');
+    businessPtr.id = businessId;
+    
+    const fbApp = new Parse.Object('FacebookApp');
+    fbApp.set('business', businessPtr);
+    fbApp.set('appId', appId);
+    fbApp.set('appName', appName || `App ${appId}`);
+    fbApp.set('pageId', pageId);
+    fbApp.set('pageName', pageName || '');
+    fbApp.set('webhookUrl', webhookUrl || 'https://webhook.innoserver.cloud/facebook/webhook');
+    fbApp.set('verifyToken', verifyToken || VERIFY_TOKEN);
+    fbApp.set('permissions', permissions || []);
+    fbApp.set('status', 'active');
+    fbApp.set('createdBy', 'api');
+    
+    await fbApp.save(null, { useMasterKey: true });
+    
+    res.json({ success: true, objectId: fbApp.id, message: 'Facebook App registered successfully' });
+  } catch (err) {
+    console.error('[FacebookApps] Create error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update Facebook App
+app.put('/api/facebook-apps/:id', async (req, res) => {
+  try {
+    const query = new Parse.Query('FacebookApp');
+    const fbApp = await query.get(req.params.id, { useMasterKey: true });
+    
+    const allowedFields = ['appName', 'pageName', 'webhookUrl', 'verifyToken', 'permissions', 'status'];
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        fbApp.set(field, req.body[field]);
+      }
+    });
+    
+    await fbApp.save(null, { useMasterKey: true });
+    
+    res.json({ success: true, message: 'Facebook App updated successfully' });
+  } catch (err) {
+    console.error('[FacebookApps] Update error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete Facebook App
+app.delete('/api/facebook-apps/:id', async (req, res) => {
+  try {
+    const query = new Parse.Query('FacebookApp');
+    const fbApp = await query.get(req.params.id, { useMasterKey: true });
+    await fbApp.destroy({ useMasterKey: true });
+    
+    res.json({ success: true, message: 'Facebook App deleted successfully' });
+  } catch (err) {
+    console.error('[FacebookApps] Delete error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Verify Facebook App webhook configuration
+app.post('/api/facebook-apps/:id/verify', async (req, res) => {
+  try {
+    const query = new Parse.Query('FacebookApp');
+    const fbApp = await query.get(req.params.id, { useMasterKey: true });
+    
+    const pageId = fbApp.get('pageId');
+    const businessQuery = new Parse.Query('Business');
+    businessQuery.equalTo('fbPageId', pageId);
+    const business = await businessQuery.first({ useMasterKey: true });
+    
+    if (!business) {
+      return res.status(400).json({ error: 'No business found for this page ID' });
+    }
+    
+    // Try to get page access token and verify with Graph API
+    const token = await getPageAccessToken(business);
+    const verifyUrl = `${GRAPH_API_BASE}/me?access_token=${token}`;
+    const verifyRes = await fetch(verifyUrl);
+    const verifyData = await verifyRes.json();
+    
+    if (verifyRes.ok && verifyData.id) {
+      fbApp.set('lastVerified', new Date());
+      fbApp.set('status', 'active');
+      await fbApp.save(null, { useMasterKey: true });
+      
+      res.json({
+        success: true,
+        message: 'Facebook App verified successfully',
+        page: {
+          id: verifyData.id,
+          name: verifyData.name
+        }
+      });
+    } else {
+      fbApp.set('status', 'error');
+      await fbApp.save(null, { useMasterKey: true });
+      res.status(400).json({ success: false, error: verifyData.error || 'Verification failed' });
+    }
+  } catch (err) {
+    console.error('[FacebookApps] Verify error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Test send message via Facebook App
+app.post('/api/facebook-apps/:id/test-message', async (req, res) => {
+  try {
+    const { recipientPsid, message } = req.body;
+    
+    if (!recipientPsid || !message) {
+      return res.status(400).json({ error: 'recipientPsid and message are required' });
+    }
+    
+    const query = new Parse.Query('FacebookApp');
+    const fbApp = await query.get(req.params.id, { useMasterKey: true });
+    
+    const pageId = fbApp.get('pageId');
+    const businessQuery = new Parse.Query('Business');
+    businessQuery.equalTo('fbPageId', pageId);
+    const business = await businessQuery.first({ useMasterKey: true });
+    
+    if (!business) {
+      return res.status(400).json({ error: 'No business found for this page ID' });
+    }
+    
+    const token = await getPageAccessToken(business);
+    const result = await callSendApi(token, recipientPsid, message);
+    
+    if (result.success) {
+      res.json({ success: true, messageId: result.messageId });
+    } else {
+      res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error('[FacebookApps] Test message error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get Facebook App statistics
+app.get('/api/facebook-apps/:id/stats', async (req, res) => {
+  try {
+    const query = new Parse.Query('FacebookApp');
+    const fbApp = await query.get(req.params.id, { useMasterKey: true });
+    
+    const pageId = fbApp.get('pageId');
+    
+    // Get business
+    const businessQuery = new Parse.Query('Business');
+    businessQuery.equalTo('fbPageId', pageId);
+    const business = await businessQuery.first({ useMasterKey: true });
+    
+    if (!business) {
+      return res.json({ success: true, stats: { contacts: 0, conversations: 0, messages: 0, leads: 0 } });
+    }
+    
+    // Count contacts
+    const contactQuery = new Parse.Query('MessengerContact');
+    contactQuery.equalTo('business', business);
+    const contacts = await contactQuery.count({ useMasterKey: true });
+    
+    // Count conversations
+    const convQuery = new Parse.Query('Conversation');
+    convQuery.equalTo('business', business);
+    const conversations = await convQuery.count({ useMasterKey: true });
+    
+    // Count messages (last 30 days)
+    const msgQuery = new Parse.Query('Message');
+    msgQuery.equalTo('business', business);
+    msgQuery.greaterThan('createdAt', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+    const messages = await msgQuery.count({ useMasterKey: true });
+    
+    // Count leads
+    const leadQuery = new Parse.Query('Lead');
+    leadQuery.equalTo('business', business);
+    const leads = await leadQuery.count({ useMasterKey: true });
+    
+    // Count webhook logs (last 7 days)
+    const logQuery = new Parse.Query('WebhookLog');
+    logQuery.greaterThan('createdAt', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+    const webhookEvents = await logQuery.count({ useMasterKey: true });
+    
+    res.json({
+      success: true,
+      stats: {
+        contacts,
+        conversations,
+        messagesLast30Days: messages,
+        leads,
+        webhookEventsLast7Days: webhookEvents
+      }
+    });
+  } catch (err) {
+    console.error('[FacebookApps] Stats error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+console.log('[Server] Facebook App management endpoints loaded');
+
+// =============================================================================
+// End-to-End Flow Testing
+// =============================================================================
+
+// Simulate incoming webhook (for testing)
+app.post('/api/test/simulate-message', async (req, res) => {
+  try {
+    const { pageId, senderPsid, message } = req.body;
+    
+    if (!pageId || !senderPsid || !message) {
+      return res.status(400).json({ error: 'pageId, senderPsid, and message are required' });
+    }
+    
+    // Build a mock webhook payload
+    const mockPayload = {
+      object: 'page',
+      entry: [{
+        id: pageId,
+        time: Date.now(),
+        messaging: [{
+          sender: { id: senderPsid },
+          recipient: { id: pageId },
+          timestamp: Date.now(),
+          message: {
+            mid: `test_${Date.now()}`,
+            text: message
+          }
+        }]
+      }]
+    };
+    
+    // Log it
+    const log = new Parse.Object('WebhookLog');
+    log.set('objectType', 'page');
+    log.set('payload', mockPayload);
+    log.set('receivedAt', new Date());
+    log.set('isTest', true);
+    await log.save(null, { useMasterKey: true });
+    
+    // Get business
+    const businessQuery = new Parse.Query('Business');
+    businessQuery.equalTo('fbPageId', pageId);
+    const business = await businessQuery.first({ useMasterKey: true });
+    
+    if (!business) {
+      return res.status(400).json({ error: 'No business found for page ID: ' + pageId });
+    }
+    
+    // Get or create contact
+    const contact = await getOrCreateContact(business, senderPsid, 'messenger');
+    
+    // Get or create conversation
+    const conversation = await getOrCreateConversation(business, contact, 'messenger');
+    
+    // Save incoming message
+    const inMsg = new Parse.Object('Message');
+    inMsg.set('business', business);
+    inMsg.set('conversation', conversation);
+    inMsg.set('contact', contact);
+    inMsg.set('direction', 'inbound');
+    inMsg.set('channel', 'messenger');
+    inMsg.set('text', message);
+    inMsg.set('messageId', `test_${Date.now()}`);
+    await inMsg.save(null, { useMasterKey: true });
+    
+    // Process with AI proxy (simplified for testing)
+    let aiResponse = '[Test] Thank you for your interest in becoming a PlataPay agent!';
+    try {
+      const aiRes = await fetch(`${AI_PROXY_URL}/chat`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-API-Secret': AI_API_SECRET 
+        },
+        body: JSON.stringify({
+          message: message,
+          context: {
+            contactName: contact.get('firstName') || 'there',
+            channel: 'messenger',
+            isTest: true
+          }
+        })
+      });
+      if (aiRes.ok) {
+        const aiData = await aiRes.json();
+        aiResponse = aiData.response || aiData.message || aiResponse;
+      }
+    } catch (aiErr) {
+      console.log('[Test] AI proxy not available, using fallback response');
+    }
+    
+    // Save AI response
+    const outMsg = new Parse.Object('Message');
+    outMsg.set('business', business);
+    outMsg.set('conversation', conversation);
+    outMsg.set('contact', contact);
+    outMsg.set('direction', 'outbound');
+    outMsg.set('channel', 'messenger');
+    outMsg.set('text', aiResponse);
+    outMsg.set('messageId', `test_response_${Date.now()}`);
+    await outMsg.save(null, { useMasterKey: true });
+    
+    res.json({
+      success: true,
+      flow: {
+        step1_webhook: 'Received webhook payload',
+        step2_contact: { objectId: contact.id, name: `${contact.get('firstName')} ${contact.get('lastName')}` },
+        step3_conversation: { objectId: conversation.id, status: conversation.get('status') },
+        step4_message_saved: { objectId: inMsg.id },
+        step5_ai_response: aiResponse,
+        step6_response_saved: { objectId: outMsg.id }
+      },
+      note: 'This is a simulation. In production, the response would be sent via Facebook Send API.'
+    });
+  } catch (err) {
+    console.error('[Test] Simulate message error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Full E2E test with actual Facebook send
+app.post('/api/test/e2e-flow', async (req, res) => {
+  try {
+    const { pageId, recipientPsid, testMessage } = req.body;
+    
+    if (!pageId || !recipientPsid) {
+      return res.status(400).json({ error: 'pageId and recipientPsid are required' });
+    }
+    
+    const message = testMessage || 'Hello! This is a test message from InnovateHub E2E flow.';
+    
+    // Step 1: Get business
+    const businessQuery = new Parse.Query('Business');
+    businessQuery.equalTo('fbPageId', pageId);
+    const business = await businessQuery.first({ useMasterKey: true });
+    
+    if (!business) {
+      return res.status(400).json({ error: 'No business found for page ID: ' + pageId });
+    }
+    
+    // Step 2: Get Facebook App record
+    const appQuery = new Parse.Query('FacebookApp');
+    appQuery.equalTo('pageId', pageId);
+    const fbApp = await appQuery.first({ useMasterKey: true });
+    
+    // Step 3: Get or create contact
+    const contact = await getOrCreateContact(business, recipientPsid, 'messenger');
+    
+    // Step 4: Get or create conversation
+    const conversation = await getOrCreateConversation(business, contact, 'messenger');
+    
+    // Step 5: Get access token and send message
+    const token = await getPageAccessToken(business);
+    const sendResult = await callSendApi(token, recipientPsid, message);
+    
+    // Step 6: Save outgoing message
+    const outMsg = new Parse.Object('Message');
+    outMsg.set('business', business);
+    outMsg.set('conversation', conversation);
+    outMsg.set('contact', contact);
+    outMsg.set('direction', 'outbound');
+    outMsg.set('channel', 'messenger');
+    outMsg.set('text', message);
+    outMsg.set('messageId', sendResult.messageId || `e2e_${Date.now()}`);
+    outMsg.set('sendSuccess', sendResult.success);
+    await outMsg.save(null, { useMasterKey: true });
+    
+    res.json({
+      success: true,
+      e2eFlow: {
+        step1_business: { objectId: business.id, name: business.get('name') },
+        step2_facebookApp: fbApp ? { objectId: fbApp.id, appId: fbApp.get('appId'), status: fbApp.get('status') } : 'Not registered (using Business token)',
+        step3_contact: { objectId: contact.id, firstName: contact.get('firstName'), lastName: contact.get('lastName') },
+        step4_conversation: { objectId: conversation.id, status: conversation.get('status') },
+        step5_sendApi: sendResult,
+        step6_messageSaved: { objectId: outMsg.id }
+      }
+    });
+  } catch (err) {
+    console.error('[Test] E2E flow error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+console.log('[Server] E2E flow testing endpoints loaded');
+
+// =============================================================================
 // Start Server + All Cron Jobs
 // =============================================================================
 
