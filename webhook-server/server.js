@@ -606,7 +606,7 @@ const EMAIL_TEMPLATES = {
         <div style="font-size:24px;font-weight:bold;color:${PLATAPAY_BRAND_COLOR};margin:10px 0;">${data.date}</div>
         <div style="font-size:20px;margin:10px 0;">🕐 ${data.timeSlot}</div>
         <div style="background:#f0f0f0;padding:10px;border-radius:8px;margin:15px 0;">
-          <strong>Confirmation Code:</strong><br>
+          <strong>Booking Reference:</strong><br>
           <span style="font-size:28px;font-weight:bold;letter-spacing:3px;color:${PLATAPAY_BRAND_COLOR};">${data.confirmationCode}</span>
         </div>
       </div>
@@ -627,7 +627,8 @@ const EMAIL_TEMPLATES = {
       </div>
       
       <div class="note">
-        <p><strong>Need to reschedule?</strong> Reply to this email or call +639176851216 at least 24 hours before your appointment.</p>
+        <p><strong>Can't make it?</strong> No worries! Just message our PlataPay Assistant on Messenger with your booking reference <strong>${data.confirmationCode}</strong> to reschedule or cancel.</p>
+        <p style="margin-top:10px;"><a href="https://m.me/platapayph" style="color:${PLATAPAY_BRAND_COLOR};">💬 Message PlataPay Assistant</a></p>
       </div>`
   }),
 
