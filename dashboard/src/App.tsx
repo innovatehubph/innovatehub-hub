@@ -24,6 +24,7 @@ import CompetitiveIntel from './pages/CompetitiveIntel'
 import PredictiveAnalytics from './pages/PredictiveAnalytics'
 import ImageGenerator from './pages/ImageGenerator'
 import FacebookApps from './pages/FacebookApps'
+import Home from './pages/Home'
 
 export default function App() {
   const [activeBusiness, setActiveBusiness] = useState('')
@@ -53,7 +54,8 @@ export default function App() {
   return (
     <Layout activeBusiness={activeBusiness} onBusinessChange={setActiveBusiness}>
       <Routes>
-        <Route path="/" element={<Dashboard businessId={activeBusiness} />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/dashboard" element={<Dashboard businessId={activeBusiness} />} />
         <Route path="/businesses" element={<Businesses />} />
         <Route path="/messenger" element={<Messenger businessId={activeBusiness} />} />
         <Route path="/bot-flows" element={<BotFlows businessId={activeBusiness} />} />
