@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Building2, MessageSquare, Bot, FileText,
   Megaphone, ShoppingBag, Package, Key, Webhook, Users,
   Facebook, Settings, ChevronLeft, ChevronRight, Menu, Wand2,
-  Magnet, Mail, UserCheck, LogOut, Target, TrendingUp
+  Magnet, Mail, UserCheck, LogOut, Target, TrendingUp, ImagePlus
 } from 'lucide-react';
 import Parse, { BUSINESSES } from '../config/parse';
 import ChatWidget from './ChatWidget';
@@ -27,6 +27,7 @@ const navItems = [
   { path: '/webhooks', label: 'Webhook Logs', icon: Webhook },
   { path: '/users', label: 'Users & Roles', icon: Users },
   { path: '/facebook-setup', label: 'Facebook Setup', icon: Facebook },
+  { path: '/image-generator', label: 'Image Generator', icon: ImagePlus },
   { path: '/ai-workshop', label: 'AI Workshop', icon: Wand2 },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];

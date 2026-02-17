@@ -22,6 +22,7 @@ import NurtureSequences from './pages/NurtureSequences'
 import AgentPipeline from './pages/AgentPipeline'
 import CompetitiveIntel from './pages/CompetitiveIntel'
 import PredictiveAnalytics from './pages/PredictiveAnalytics'
+import ImageGenerator from './pages/ImageGenerator'
 
 export default function App() {
   const [activeBusiness, setActiveBusiness] = useState('')
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="/agent-pipeline" element={<AgentPipeline businessId={activeBusiness} />} />
         <Route path="/competitive-intel" element={<CompetitiveIntel />} />
         <Route path="/predictive-analytics" element={<PredictiveAnalytics />} />
+        <Route path="/image-generator" element={<ImageGenerator />} />
         <Route path="/ai-workshop" element={<AIWorkshop businessId={activeBusiness} />} />
         <Route path="/settings" element={<Settings businessId={activeBusiness} onBusinessChange={setActiveBusiness} />} />
       </Routes>

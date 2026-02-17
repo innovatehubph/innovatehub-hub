@@ -9,6 +9,7 @@ const Parse = require('parse/node');
 const fetch = require('node-fetch');
 const nodemailer = require('nodemailer');
 const ImageGenerator = require('../image-generator');
+const OpenRouterImageGenerator = require('../image-generator/openrouter-provider');
 
 // --- Configuration ---
 const PORT = 3790;
@@ -176,6 +177,80 @@ const EMAIL_TEMPLATES = {
       </div>
       <p>Download our mobile app for even more convenience.</p>`
   }),
+
+  // 3.5. Agent Recruitment Marketing Email (with AI-generated hero image)
+  agent_recruitment: (data) => {
+    const heroHtml = data.heroImage 
+      ? `<img src="${data.heroImage}" alt="Become a PlataPay Agent" width="600" height="400" style="width:100%;max-width:600px;height:auto;border-radius:12px;margin:20px 0;display:block;border:0;" />` 
+      : '';
+    return emailBaseTemplate({
+    title: 'Start Your Own PlataPay Outlet',
+    preheader: data.preheader || 'Be your own boss. Earn up to ₱50,000/month.',
+    bodyContent: `
+      <p>Good day${data.name ? ', ' + data.name : ''}!</p>
+      <p>Are you looking for a <strong>proven business opportunity</strong> with low capital and high earning potential?</p>
+      <p><strong>Become a PlataPay Agent</strong> and offer essential financial services to your community:</p>
+      
+      ${heroHtml}
+      
+      <table style="width:100%;margin:20px 0;border-collapse:separate;border-spacing:8px;">
+        <tr>
+          <td style="padding:15px;background:#f8f9fa;border-radius:8px;text-align:center;width:25%;">
+            <div style="font-size:28px;">💸</div>
+            <div style="font-weight:bold;color:${PLATAPAY_BRAND_COLOR};margin-top:8px;">Cash In/Out</div>
+          </td>
+          <td style="padding:15px;background:#f8f9fa;border-radius:8px;text-align:center;width:25%;">
+            <div style="font-size:28px;">📱</div>
+            <div style="font-weight:bold;color:${PLATAPAY_BRAND_COLOR};margin-top:8px;">E-Loading</div>
+          </td>
+          <td style="padding:15px;background:#f8f9fa;border-radius:8px;text-align:center;width:25%;">
+            <div style="font-size:28px;">🧾</div>
+            <div style="font-weight:bold;color:${PLATAPAY_BRAND_COLOR};margin-top:8px;">Bills Payment</div>
+          </td>
+          <td style="padding:15px;background:#f8f9fa;border-radius:8px;text-align:center;width:25%;">
+            <div style="font-size:28px;">🌍</div>
+            <div style="font-weight:bold;color:${PLATAPAY_BRAND_COLOR};margin-top:8px;">Remittance</div>
+          </td>
+        </tr>
+      </table>
+      
+      <h3 style="color:${PLATAPAY_BRAND_COLOR};margin-top:30px;">Why Partner with PlataPay?</h3>
+      <ul style="padding-left:20px;">
+        <li><strong>Low Investment</strong> – Start with as little as ₱15,000</li>
+        <li><strong>High Commission</strong> – Earn on every transaction</li>
+        <li><strong>Full Support</strong> – Training, marketing materials, and 24/7 tech support</li>
+        <li><strong>Trusted Brand</strong> – BSP-supervised, serving 500+ communities nationwide</li>
+        <li><strong>Easy Setup</strong> – Get operational in as fast as 3 days</li>
+      </ul>
+      
+      <div style="background:linear-gradient(135deg,${PLATAPAY_BRAND_COLOR} 0%,#7B4FA2 100%);color:white;padding:25px;border-radius:12px;margin:30px 0;text-align:center;">
+        <div style="font-size:14px;opacity:0.9;">AVERAGE MONTHLY EARNINGS</div>
+        <div style="font-size:42px;font-weight:bold;margin:10px 0;">₱30,000 - ₱50,000</div>
+        <div style="font-size:14px;opacity:0.9;">Based on active agents with 100+ daily transactions</div>
+      </div>
+      
+      <h3 style="color:${PLATAPAY_BRAND_COLOR};">What You Need to Start</h3>
+      <ul style="padding-left:20px;">
+        <li>Valid ID and proof of address</li>
+        <li>Small space (even a corner of your existing store works)</li>
+        <li>Smartphone or computer with internet</li>
+        <li>Initial working capital (₱15,000 minimum)</li>
+      </ul>
+      
+      <p style="margin-top:30px;">Ready to take the first step toward financial independence?</p>
+      
+      <div class="button-wrapper">
+        <a href="${data.ctaUrl || 'https://platapay.ph/become-an-agent'}" class="button button-purple">${data.ctaLabel || 'Apply Now – It is Free'}</a>
+      </div>
+      
+      <p>Or reply to this email with your <strong>complete name</strong>, <strong>location</strong>, and <strong>contact number</strong>, and our team will reach out within 24 hours.</p>
+      
+      <p style="margin-top:30px;">Salamat po,</p>
+      <p><strong>PlataPay Partner Recruitment Team</strong><br>
+      InnovateHub Inc.<br>
+      <a href="mailto:partners@platapay.ph" style="color:${PLATAPAY_BRAND_COLOR};">partners@platapay.ph</a> | 
+      <a href="https://platapay.ph" style="color:${PLATAPAY_BRAND_COLOR};">www.platapay.ph</a></p>`
+  })},
 
   // 4. Franchise Inquiry Follow-up
   franchise_inquiry: (data) => emailBaseTemplate({
@@ -520,12 +595,18 @@ const EMAIL_TEMPLATES = {
 };
 
 // --- Send Email Function ---
-async function sendEmail({ to, template, data, subject }) {
+async function sendEmail({ to, template, data, subject, attachments }) {
   try {
     const templateFn = EMAIL_TEMPLATES[template];
     if (!templateFn) throw new Error(`Unknown email template: ${template}`);
 
     const html = templateFn(data || {}).replace(/\{\{email\}\}/g, encodeURIComponent(to));
+    
+    // Debug: Save last email HTML for inspection
+    if (template === 'agent_recruitment') {
+      require('fs').writeFileSync('/tmp/last-email.html', html);
+      console.log('[Email] Saved debug HTML to /tmp/last-email.html');
+    }
 
     const mailOptions = {
       from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM_ADDRESS}>`,
@@ -533,6 +614,11 @@ async function sendEmail({ to, template, data, subject }) {
       subject: subject || data.subject || 'Message from PlataPay',
       html: html,
     };
+    
+    // Support attachments (array of { filename, path } or { filename, content, contentType })
+    if (attachments && attachments.length > 0) {
+      mailOptions.attachments = attachments;
+    }
 
     const info = await emailTransporter.sendMail(mailOptions);
     console.log(`[Email] Sent "${template}" to ${to} — msgId: ${info.messageId}`);
@@ -847,6 +933,7 @@ Parse.masterKey = 't78J6V3bHE18i0ZfTIqVIyLUxlLYdU0L1GZYJd4h';
 const app = express();
 app.use(express.json({ limit: '5mb' }));
 app.use('/assets', express.static('/root/innovatehub-hub/docs/assets'));
+app.use('/generated', express.static('/root/innovatehub-hub/image-generator/generated'));
 
 // =============================================================================
 // Helpers
@@ -2316,11 +2403,33 @@ app.post('/api/webinar/register', async (req, res) => {
 // Send a single email
 app.post('/api/send-email', async (req, res) => {
   try {
-    const { to, template, data, subject } = req.body;
+    const { to, template, data, subject, attachments, imageUrl } = req.body;
     if (!to || !template) {
       return res.status(400).json({ error: 'to and template are required' });
     }
-    const result = await sendEmail({ to, template, data: data || {}, subject });
+    
+    // Build attachments array
+    let emailAttachments = attachments || [];
+    
+    // If imageUrl provided, download and attach it
+    if (imageUrl) {
+      try {
+        const axios = require('axios');
+        const response = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 30000 });
+        const filename = imageUrl.split('/').pop() || 'marketing-image.png';
+        emailAttachments.push({
+          filename,
+          content: Buffer.from(response.data),
+          contentType: response.headers['content-type'] || 'image/png',
+          cid: 'marketing-image' // For inline embedding
+        });
+      } catch (imgErr) {
+        console.error('[Email] Failed to download image for attachment:', imgErr.message);
+      }
+    }
+    
+    console.log('[Email API] Template:', template, 'Data:', JSON.stringify(data));
+    const result = await sendEmail({ to, template, data: data || {}, subject, attachments: emailAttachments });
     res.json(result);
   } catch (err) {
     console.error('[API] send-email error:', err.message);
@@ -5073,6 +5182,197 @@ app.get('/api/images/quick/:type', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('[ImageGen] Quick generate error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =============================================================================
+// PlataPay OpenRouter Image Generator (GPT-5 Image)
+// =============================================================================
+
+const openRouterGenerator = new OpenRouterImageGenerator({
+  apiKey: process.env.OPENROUTER_API_KEY || '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',
+  model: 'gpt-5-image-mini'
+});
+
+// Generate PlataPay marketing image using master template
+app.post('/api/platapay/generate-image', async (req, res) => {
+  try {
+    const {
+      prompt,
+      scene,
+      location,
+      customers,
+      model = 'gpt-5-image-mini',
+      referenceImages = [],
+      additionalContext
+    } = req.body;
+
+    const result = await openRouterGenerator.generate({
+      prompt,
+      scene,
+      location,
+      customers,
+      model,
+      referenceImages,
+      additionalContext
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[PlataPay ImageGen] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate from Visual Marketing Playbook scene
+app.post('/api/platapay/generate-scene', async (req, res) => {
+  try {
+    const {
+      scene,
+      model = 'gpt-5-image-mini',
+      referenceImages = [],
+      additionalContext
+    } = req.body;
+
+    if (!scene) {
+      return res.status(400).json({ 
+        error: 'scene is required',
+        availableScenes: Object.keys(OpenRouterImageGenerator.getScenes())
+      });
+    }
+
+    const result = await openRouterGenerator.generateScene(scene, {
+      model,
+      referenceImages,
+      additionalContext
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[PlataPay Scene] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate multi-scene campaign
+app.post('/api/platapay/generate-campaign', async (req, res) => {
+  try {
+    const {
+      name,
+      scenes = ['ofw_remittance', 'rural_queue', 'school_students'],
+      model = 'gpt-5-image-mini',
+      referenceImages = []
+    } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+
+    const result = await openRouterGenerator.generateCampaign({
+      name,
+      scenes,
+      model,
+      referenceImages
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[PlataPay Campaign] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate seasonal campaign
+app.post('/api/platapay/generate-seasonal', async (req, res) => {
+  try {
+    const {
+      month,
+      model = 'gpt-5-image-mini',
+      referenceImages = []
+    } = req.body;
+
+    if (!month) {
+      return res.status(400).json({ 
+        error: 'month is required',
+        availableMonths: Object.keys(OpenRouterImageGenerator.getSeasonalThemes())
+      });
+    }
+
+    const result = await openRouterGenerator.generateSeasonalCampaign(month, {
+      model,
+      referenceImages
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[PlataPay Seasonal] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Analyze image with vision
+app.post('/api/platapay/analyze-image', async (req, res) => {
+  try {
+    const { imageUrl, prompt } = req.body;
+
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'imageUrl is required' });
+    }
+
+    const result = await openRouterGenerator.analyzeImage(imageUrl, prompt);
+    res.json(result);
+  } catch (error) {
+    console.error('[PlataPay Analyze] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get available scenes from Visual Marketing Playbook
+app.get('/api/platapay/scenes', (req, res) => {
+  const scenes = OpenRouterImageGenerator.getScenes();
+  res.json({
+    scenes,
+    count: Object.keys(scenes).length,
+    priorityOrder: Object.entries(scenes)
+      .sort((a, b) => a[1].priority - b[1].priority)
+      .map(([key, value]) => ({ key, ...value }))
+  });
+});
+
+// Get seasonal themes
+app.get('/api/platapay/seasonal-themes', (req, res) => {
+  res.json({
+    themes: OpenRouterImageGenerator.getSeasonalThemes()
+  });
+});
+
+// Get master prompt template
+app.get('/api/platapay/master-template', (req, res) => {
+  res.json({
+    template: OpenRouterImageGenerator.getMasterTemplate(),
+    brandAssets: OpenRouterImageGenerator.getBrandAssets(),
+    models: OpenRouterImageGenerator.getModels()
+  });
+});
+
+// Quick scene generation (GET for easy testing)
+app.get('/api/platapay/quick/:scene', async (req, res) => {
+  try {
+    const { scene } = req.params;
+    const scenes = OpenRouterImageGenerator.getScenes();
+
+    if (!scenes[scene]) {
+      return res.status(400).json({
+        error: `Unknown scene: ${scene}`,
+        availableScenes: Object.keys(scenes)
+      });
+    }
+
+    const result = await openRouterGenerator.generateScene(scene);
+    res.json(result);
+  } catch (error) {
+    console.error('[PlataPay Quick] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
