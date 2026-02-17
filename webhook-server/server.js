@@ -21,6 +21,7 @@ const AI_API_SECRET = 'innovatehub-ai-2026';
 const EMAIL_FROM_NAME = 'PlataPay';
 const EMAIL_FROM_ADDRESS = 'admin@innovatehub.ph';
 const PLATAPAY_LOGO_URL = 'https://webhook.innoserver.cloud/assets/PlataPay.png';
+const INNOVATEHUB_LOGO_URL = 'https://webhook.innoserver.cloud/assets/InnovateHub.png';
 const PLATAPAY_BRAND_COLOR = '#57317A';
 const PLATAPAY_CTA_COLOR = '#28a745';
 
@@ -94,6 +95,7 @@ function emailBaseTemplate({ title, preheader, bodyContent }) {
       ${bodyContent}
     </div>
     <div class="footer">
+      <div style="font-size:18px;font-weight:bold;margin-bottom:15px;letter-spacing:1px;">INNOVATEHUB</div>
       <div class="social-links">
         <a href="https://facebook.com/PlataPay">Facebook</a> &bull;
         <a href="https://platapay.ph">Website</a> &bull;
@@ -133,18 +135,18 @@ const EMAIL_TEMPLATES = {
 
   // 2. Welcome Email (New Lead / Agent)
   welcome_agent: (data) => emailBaseTemplate({
-    title: 'Welcome to PlataPay! 🎉',
+    title: 'Welcome to PlataPay',
     preheader: 'Your journey to financial empowerment starts now',
     bodyContent: `
-      <p>Hi ${data.name || 'there'}!</p>
-      <p>Welcome to the PlataPay family! We're excited that you're interested in becoming part of our growing network of agents nationwide.</p>
+      <p>Hi ${data.name || 'there'},</p>
+      <p>Welcome to the PlataPay family. We're excited that you're interested in becoming part of our growing network of agents nationwide.</p>
       <div class="highlight-box">
         <h3 style="margin:0 0 10px;color:${PLATAPAY_BRAND_COLOR};">Why PlataPay?</h3>
-        <div class="service-item">✅ Earn commissions on every transaction</div>
-        <div class="service-item">✅ 13+ services in one platform (bills, e-load, remittance, and more)</div>
-        <div class="service-item">✅ Full training and ongoing support</div>
-        <div class="service-item">✅ 80,000+ strong agent network</div>
-        <div class="service-item">✅ BSP-compliant and secure platform</div>
+        <div class="service-item">Earn commissions on every transaction</div>
+        <div class="service-item">13+ services in one platform (bills, e-load, remittance, and more)</div>
+        <div class="service-item">Full training and ongoing support</div>
+        <div class="service-item">80,000+ strong agent network</div>
+        <div class="service-item">BSP-compliant and secure platform</div>
       </div>
       <div style="text-align:center;margin:30px 0;">
         <a href="https://platapay.ph/franchise" class="button">Explore Business Packages</a>
@@ -157,23 +159,23 @@ const EMAIL_TEMPLATES = {
 
   // 3. Welcome Email (Customer)
   welcome_customer: (data) => emailBaseTemplate({
-    title: 'Welcome to PlataPay!',
+    title: 'Welcome to PlataPay',
     preheader: 'Financial freedom at your fingertips',
     bodyContent: `
-      <p>Hi ${data.name || 'there'}!</p>
+      <p>Hi ${data.name || 'there'},</p>
       <p>Thank you for joining PlataPay — your partner in secure and seamless financial transactions.</p>
       <div class="highlight-box">
         <h3 style="margin:0 0 10px;color:${PLATAPAY_BRAND_COLOR};">What You Can Do with PlataPay</h3>
-        <div class="service-item">💡 <strong>Pay Bills</strong> — Electric, water, internet, cable TV</div>
-        <div class="service-item">📱 <strong>E-Load</strong> — All networks: Globe, Smart, TNT, DITO, Sun, TM</div>
-        <div class="service-item">💸 <strong>Send Money</strong> — Nationwide and international remittance</div>
-        <div class="service-item">🏛️ <strong>Gov't Payments</strong> — SSS, PhilHealth, Pag-IBIG, NBI, LTO</div>
-        <div class="service-item">✈️ <strong>Travel & More</strong> — Airline tickets, tours, insurance</div>
+        <div class="service-item"><strong>Pay Bills</strong> — Electric, water, internet, cable TV</div>
+        <div class="service-item"><strong>E-Load</strong> — All networks: Globe, Smart, TNT, DITO, Sun, TM</div>
+        <div class="service-item"><strong>Send Money</strong> — Nationwide and international remittance</div>
+        <div class="service-item"><strong>Gov't Payments</strong> — SSS, PhilHealth, Pag-IBIG, NBI, LTO</div>
+        <div class="service-item"><strong>Travel & More</strong> — Airline tickets, tours, insurance</div>
       </div>
       <div style="text-align:center;margin:30px 0;">
         <a href="https://platapay.ph/agents" class="button">Find a PlataPay Agent Near You</a>
       </div>
-      <p>Download our mobile app for even more convenience!</p>`
+      <p>Download our mobile app for even more convenience.</p>`
   }),
 
   // 4. Franchise Inquiry Follow-up
@@ -181,15 +183,15 @@ const EMAIL_TEMPLATES = {
     title: 'Your PlataPay Franchise Inquiry',
     preheader: 'Start your own digital payments business',
     bodyContent: `
-      <p>Hi ${data.name || 'there'}!</p>
+      <p>Hi ${data.name || 'there'},</p>
       <p>Thank you for your interest in a PlataPay franchise. Here's a quick overview of our business packages:</p>
       <div class="highlight-box">
-        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📦 PlataPay Business Lite — ₱449,000</h3>
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">PlataPay Business Lite — P449,000</h3>
         <p style="margin:5px 0;">3-Year Contract | All services included | Agent panel access</p>
         <p style="margin:5px 0;font-size:14px;color:#666;">ROI: As fast as 3 months (high volume) or ~22 months (conservative)</p>
       </div>
       <div class="highlight-box">
-        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">🏆 PlataPay All-in-One Business — ₱799,000</h3>
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">PlataPay All-in-One Business — P799,000</h3>
         <p style="margin:5px 0;">Lifetime Contract | Complete package | Premium support</p>
         <p style="margin:5px 0;font-size:14px;color:#666;">Best value for serious entrepreneurs</p>
       </div>
@@ -210,7 +212,7 @@ const EMAIL_TEMPLATES = {
       <p>Hi ${data.name || 'there'}!</p>
       <p>Curious about how much you can earn as a PlataPay agent? Here's a breakdown:</p>
       <div class="highlight-box">
-        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">💰 Commission Examples</h3>
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Commission Examples</h3>
         <div class="service-item"><strong>Bills Payment:</strong> ₱5-15 per transaction</div>
         <div class="service-item"><strong>E-Loading:</strong> ₱1-3 per load transaction</div>
         <div class="service-item"><strong>Remittance:</strong> ₱10-25 per transaction</div>
@@ -258,11 +260,11 @@ const EMAIL_TEMPLATES = {
       <p>Over the past few days, we've shared how PlataPay can help you build a profitable business while serving your community.</p>
       <p>Here's a quick recap of what you'll get:</p>
       <div class="highlight-box">
-        <div class="service-item">✅ 13+ revenue-generating services</div>
-        <div class="service-item">✅ Real-time commission tracking</div>
-        <div class="service-item">✅ Full training and support</div>
-        <div class="service-item">✅ Packages starting at ₱449,000</div>
-        <div class="service-item">✅ ROI as fast as 3 months</div>
+        <div class="service-item">13+ revenue-generating services</div>
+        <div class="service-item">Real-time commission tracking</div>
+        <div class="service-item">Full training and support</div>
+        <div class="service-item">Packages starting at ₱449,000</div>
+        <div class="service-item">ROI as fast as 3 months</div>
       </div>
       <div style="text-align:center;margin:30px 0;">
         <a href="tel:+639176851216" class="button" style="margin-bottom:10px;">📞 Call Now: +639176851216</a>
@@ -286,11 +288,11 @@ const EMAIL_TEMPLATES = {
       ${data.address ? `<div class="highlight-box"><p>📍 <strong>Address:</strong> ${data.address}</p></div>` : ''}
       <p>Visit us for fast, secure, and convenient digital payment services:</p>
       <div class="highlight-box">
-        <div class="service-item">💡 Bills Payment</div>
-        <div class="service-item">📱 E-Loading (all networks)</div>
-        <div class="service-item">💸 Remittance</div>
-        <div class="service-item">🏛️ Government Payments</div>
-        <div class="service-item">📦 J&T Parcel Services</div>
+        <div class="service-item">Bills Payment</div>
+        <div class="service-item">E-Loading (all networks)</div>
+        <div class="service-item">Remittance</div>
+        <div class="service-item">Government Payments</div>
+        <div class="service-item">J&T Parcel Services</div>
         <div class="service-item">And much more!</div>
       </div>
       <div style="text-align:center;margin:30px 0;">
@@ -323,24 +325,24 @@ const EMAIL_TEMPLATES = {
 
   // 11. TIER 2: Webinar Registration Confirmation
   webinar_registration: (data) => emailBaseTemplate({
-    title: '✅ Webinar Registration Confirmed!',
+    title: 'Webinar Registration Confirmed!',
     preheader: `You're registered for ${data.webinarTitle || 'our PlataPay Business Orientation'}`,
     bodyContent: `
       <p>Hi ${data.name || 'there'}!</p>
-      <p>Great news! Your registration for our <strong>${data.webinarTitle || 'PlataPay Business Orientation'}</strong> is confirmed! 🎉</p>
+      <p>Great news! Your registration for our <strong>${data.webinarTitle || 'PlataPay Business Orientation'}</strong> is confirmed! </p>
       
       <div class="highlight-box">
-        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📅 Webinar Details</h3>
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Webinar Details</h3>
         <div class="service-item">📆 <strong>Date:</strong> ${data.webinarDate || 'To be announced'}</div>
         <div class="service-item">🕐 <strong>Time:</strong> ${data.webinarTime || 'To be announced'} (Manila Time)</div>
         <div class="service-item">📍 <strong>Platform:</strong> ${data.platform || 'Zoom/Google Meet'}</div>
-        ${data.meetingLink ? `<div class="service-item">🔗 <strong>Link:</strong> <a href="${data.meetingLink}">${data.meetingLink}</a></div>` : ''}
-        ${data.meetingId ? `<div class="service-item">🆔 <strong>Meeting ID:</strong> ${data.meetingId}</div>` : ''}
-        ${data.passcode ? `<div class="service-item">🔑 <strong>Passcode:</strong> ${data.passcode}</div>` : ''}
+        ${data.meetingLink ? `<div class="service-item"><strong>Link:</strong> <a href="${data.meetingLink}">${data.meetingLink}</a></div>` : ''}
+        ${data.meetingId ? `<div class="service-item"><strong>Meeting ID:</strong> ${data.meetingId}</div>` : ''}
+        ${data.passcode ? `<div class="service-item"><strong>Passcode:</strong> ${data.passcode}</div>` : ''}
       </div>
 
       <div class="note">
-        <p><strong>📝 What to Prepare:</strong></p>
+        <p><strong>What to Prepare:</strong></p>
         <ul style="margin:10px 0;padding-left:20px;">
           <li>Stable internet connection</li>
           <li>Questions about PlataPay business opportunities</li>
@@ -357,24 +359,24 @@ const EMAIL_TEMPLATES = {
 
   // 12. TIER 2: Post-Webinar Follow-up
   webinar_followup: (data) => emailBaseTemplate({
-    title: 'Thanks for Attending! 🎉',
+    title: 'Thanks for Attending! ',
     preheader: `Here's your recap from the ${data.webinarTitle || 'PlataPay Business Orientation'}`,
     bodyContent: `
       <p>Hi ${data.name || 'there'}!</p>
       <p>Thank you for attending our <strong>${data.webinarTitle || 'PlataPay Business Orientation'}</strong>! We hope you found it valuable.</p>
       
       <div class="highlight-box">
-        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📋 Quick Recap</h3>
-        <div class="service-item">✅ PlataPay offers 13+ revenue-generating services</div>
-        <div class="service-item">✅ 80,000+ agents nationwide</div>
-        <div class="service-item">✅ Business Lite package: ₱449,000 (3-year contract)</div>
-        <div class="service-item">✅ All-in-One package: ₱799,000 (lifetime contract)</div>
-        <div class="service-item">✅ ROI as fast as 3 months</div>
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Quick Recap</h3>
+        <div class="service-item">PlataPay offers 13+ revenue-generating services</div>
+        <div class="service-item">80,000+ agents nationwide</div>
+        <div class="service-item">Business Lite package: ₱449,000 (3-year contract)</div>
+        <div class="service-item">All-in-One package: ₱799,000 (lifetime contract)</div>
+        <div class="service-item">ROI as fast as 3 months</div>
       </div>
 
       ${data.recordingLink ? `
       <div class="highlight-box">
-        <h3 style="margin:0 0 10px;color:${PLATAPAY_BRAND_COLOR};">🎬 Missed Something?</h3>
+        <h3 style="margin:0 0 10px;color:${PLATAPAY_BRAND_COLOR};">Missed Something?</h3>
         <p>Watch the recording anytime:</p>
         <a href="${data.recordingLink}" style="color:${PLATAPAY_BRAND_COLOR};font-weight:bold;">${data.recordingLink}</a>
       </div>
@@ -391,7 +393,7 @@ const EMAIL_TEMPLATES = {
 
   // 13. TIER 2: 7-Day Drip - Day 1 (Earnings Potential)
   drip_day1_earnings: (data) => emailBaseTemplate({
-    title: '💰 How Much Can You Really Earn?',
+    title: 'How Much Can You Really Earn?',
     preheader: 'Real earnings breakdown for PlataPay agents',
     bodyContent: `
       <p>Hi ${data.name || 'there'}!</p>
@@ -399,11 +401,11 @@ const EMAIL_TEMPLATES = {
       
       <div class="highlight-box">
         <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">💵 Commission Breakdown</h3>
-        <div class="service-item">📱 <strong>E-Loading:</strong> ₱1-3 per transaction</div>
-        <div class="service-item">💡 <strong>Bills Payment:</strong> ₱5-15 per transaction</div>
-        <div class="service-item">💸 <strong>Remittance:</strong> ₱10-25 per transaction</div>
-        <div class="service-item">📦 <strong>J&T Parcels:</strong> 20% (₱50 on ₱250 parcel)</div>
-        <div class="service-item">✈️ <strong>Travel Bookings:</strong> ₱100-500 per booking</div>
+        <div class="service-item"><strong>E-Loading:</strong> ₱1-3 per transaction</div>
+        <div class="service-item"><strong>Bills Payment:</strong> ₱5-15 per transaction</div>
+        <div class="service-item"><strong>Remittance:</strong> ₱10-25 per transaction</div>
+        <div class="service-item"><strong>J&T Parcels:</strong> 20% (₱50 on ₱250 parcel)</div>
+        <div class="service-item"><strong>Travel Bookings:</strong> ₱100-500 per booking</div>
       </div>
 
       <p><strong>Example:</strong> With just 50 transactions/day at average ₱8 commission = <strong>₱400/day or ₱10,400/month</strong> — and that's conservative!</p>
@@ -419,7 +421,7 @@ const EMAIL_TEMPLATES = {
 
   // 14. TIER 2: 7-Day Drip - Day 3 (Success Stories)
   drip_day3_success: (data) => emailBaseTemplate({
-    title: '🌟 Real Agents, Real Success',
+    title: 'Real Agents, Real Success',
     preheader: 'See how PlataPay agents are thriving',
     bodyContent: `
       <p>Hi ${data.name || 'there'}!</p>
@@ -449,28 +451,28 @@ const EMAIL_TEMPLATES = {
 
   // 15. TIER 2: 7-Day Drip - Day 5 (Franchise Details)
   drip_day5_franchise: (data) => emailBaseTemplate({
-    title: '📦 Which Package Is Right For You?',
+    title: 'Which Package Is Right For You?',
     preheader: 'Compare PlataPay franchise packages',
     bodyContent: `
       <p>Hi ${data.name || 'there'}!</p>
       <p>Ready to make it official? Here's a side-by-side comparison of our packages:</p>
       
       <div class="highlight-box">
-        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📦 Business Lite — ₱449,000</h3>
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Business Lite — ₱449,000</h3>
         <div class="service-item">📄 3-Year Contract</div>
         <div class="service-item">💻 Computer Set + Thermal Printer</div>
         <div class="service-item">🏧 Encash ATM Device</div>
         <div class="service-item">👕 2 Sets of Uniforms</div>
-        <div class="service-item">🎉 Grand Branch Opening</div>
-        <div class="service-item">💰 ₱3,000 Initial Fund</div>
+        <div class="service-item"> Grand Branch Opening</div>
+        <div class="service-item">₱3,000 Initial Fund</div>
         <div class="service-item">📍 500m Area Protection</div>
         <p style="margin-top:10px;font-size:14px;"><strong>Best for:</strong> First-time entrepreneurs</p>
       </div>
 
       <div class="highlight-box">
-        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">🏆 All-in-One — ₱799,000</h3>
-        <div class="service-item">♾️ <strong>LIFETIME</strong> Contract (no expiration!)</div>
-        <div class="service-item">✅ Everything in Business Lite</div>
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">All-in-One — ₱799,000</h3>
+        <div class="service-item"><strong>LIFETIME</strong> Contract (no expiration!)</div>
+        <div class="service-item">Everything in Business Lite</div>
         <div class="service-item">⭐ Premium support & features</div>
         <p style="margin-top:10px;font-size:14px;"><strong>Best for:</strong> Serious business owners</p>
       </div>
@@ -486,21 +488,21 @@ const EMAIL_TEMPLATES = {
 
   // 16. TIER 2: 7-Day Drip - Day 7 (Final CTA)
   drip_day7_final: (data) => emailBaseTemplate({
-    title: '⏰ Your PlataPay Journey Awaits',
+    title: 'Your PlataPay Journey Awaits',
     preheader: 'Limited slots available — start your application today',
     bodyContent: `
       <p>Hi ${data.name || 'there'}!</p>
       <p>It's been a week since you first showed interest in PlataPay. Here's a quick recap of what you'll get:</p>
       
       <div class="highlight-box">
-        <div class="service-item">✅ 13+ services in one platform</div>
-        <div class="service-item">✅ Join 80,000+ successful agents</div>
-        <div class="service-item">✅ Earn ₱10,000-50,000+ monthly</div>
-        <div class="service-item">✅ Full training and ongoing support</div>
-        <div class="service-item">✅ BSP-compliant, secure platform</div>
+        <div class="service-item">13+ services in one platform</div>
+        <div class="service-item">Join 80,000+ successful agents</div>
+        <div class="service-item">Earn ₱10,000-50,000+ monthly</div>
+        <div class="service-item">Full training and ongoing support</div>
+        <div class="service-item">BSP-compliant, secure platform</div>
       </div>
 
-      <p><strong>🔥 This week only:</strong> Schedule your FREE business orientation and get a complimentary starter kit consultation!</p>
+      <p><strong>This week only:</strong> Schedule your FREE business orientation and get a complimentary starter kit consultation!</p>
 
       <div style="text-align:center;margin:30px 0;">
         <a href="tel:+639176851216" class="button" style="font-size:18px;padding:16px 32px;">📞 Call Now: +639176851216</a>
@@ -514,7 +516,7 @@ const EMAIL_TEMPLATES = {
         <p><strong>Questions?</strong> Reply to this email or call <strong>+639176851216</strong> / landline <strong>043-772-0017</strong></p>
       </div>
 
-      <p style="text-align:center;font-size:14px;color:#666;">Not ready yet? No problem — we'll be here when you are. 😊</p>`
+      <p style="text-align:center;font-size:14px;color:#666;">Not ready yet? No problem — we'll be here when you are. </p>`
   })
 };
 
@@ -1330,7 +1332,7 @@ async function handleMessagingEvent(entry) {
               try {
                 const token = await getPageAccessToken(business);
                 await callSendApi(token, senderPsid, {
-                  text: "Thanks for your message! 😊 A team member will get back to you shortly.\n\nFor urgent concerns, call +639176851216 or Viber us anytime!"
+                  text: "Thanks for your message!  A team member will get back to you shortly.\n\nFor urgent concerns, call +639176851216 or Viber us anytime!"
                 });
                 console.log('[Fallback] Sent "human is coming" auto-reply to', senderPsid);
               } catch (fallbackErr) {
@@ -1346,7 +1348,7 @@ async function handleMessagingEvent(entry) {
           try {
             const token = await getPageAccessToken(business);
             await callSendApi(token, senderPsid, {
-              text: "Thanks for your message! 😊 A team member will review this and get back to you shortly.\n\nFor urgent concerns, call +639176851216."
+              text: "Thanks for your message!  A team member will review this and get back to you shortly.\n\nFor urgent concerns, call +639176851216."
             });
           } catch (_) {}
           conversation.set('status', 'pending');
@@ -1423,10 +1425,10 @@ async function handleMessagingEvent(entry) {
             // Customize welcome based on referral source
             const sourceWelcomes = {
               'AGENT': `Hi${firstName ? ' ' + firstName : ''}! 👋 Thanks for your interest in becoming a PlataPay Agent!\n\nWould you like to:\n• Learn about earnings potential\n• See franchise packages\n• Schedule a webinar`,
-              'EARNINGS': `Hi${firstName ? ' ' + firstName : ''}! 💰 Interested in earning with PlataPay?\n\nOur agents earn ₱10,000-50,000+ monthly!\n\nWant to know more?`,
-              'FRANCHISE': `Hi${firstName ? ' ' + firstName : ''}! 📦 Looking at PlataPay franchise packages?\n\nWe have:\n• Business Lite: ₱449,000 (3yr)\n• All-in-One: ₱799,000 (lifetime)\n\nWhich interests you?`,
-              'APPLY': `Hi${firstName ? ' ' + firstName : ''}! 📝 Ready to apply?\n\nCall us at +639176851216 or reply here to start your application!`,
-              'WEBINAR': `Hi${firstName ? ' ' + firstName : ''}! 📅 Want to join our next webinar?\n\nWe have sessions Mon-Sat at:\n• 10 AM\n• 2 PM\n• 5 PM\n• 8 PM\n\nWhich time works for you?`,
+              'EARNINGS': `Hi${firstName ? ' ' + firstName : ''}! Interested in earning with PlataPay?\n\nOur agents earn ₱10,000-50,000+ monthly!\n\nWant to know more?`,
+              'FRANCHISE': `Hi${firstName ? ' ' + firstName : ''}! Looking at PlataPay franchise packages?\n\nWe have:\n• Business Lite: ₱449,000 (3yr)\n• All-in-One: ₱799,000 (lifetime)\n\nWhich interests you?`,
+              'APPLY': `Hi${firstName ? ' ' + firstName : ''}! Ready to apply?\n\nCall us at +639176851216 or reply here to start your application!`,
+              'WEBINAR': `Hi${firstName ? ' ' + firstName : ''}! Want to join our next webinar?\n\nWe have sessions Mon-Sat at:\n• 10 AM\n• 2 PM\n• 5 PM\n• 8 PM\n\nWhich time works for you?`,
             };
 
             const welcomeMsg = sourceWelcomes[referralSource.toUpperCase()] || 
@@ -1565,14 +1567,14 @@ async function sendPipelineStageEmail(lead, business, newStage) {
       <p>We'll evaluate your application and get back to you within 3-5 business days. In the meantime, feel free to explore our services at <a href="https://platapay.ph">platapay.ph</a>.</p>
       <div class="note"><p><strong>What's next?</strong> Once approved, you'll receive your agent credentials and onboarding materials.</p></div>`
     }},
-    onboarded: { template: 'custom', subject: 'Congratulations! You\'re Now a PlataPay Agent! 🎉', data: {
-      name, content: `<p>Congratulations! 🎉 You are now officially a PlataPay Agent!</p>
+    onboarded: { template: 'custom', subject: 'Congratulations! You\'re Now a PlataPay Agent! ', data: {
+      name, content: `<p>Congratulations!  You are now officially a PlataPay Agent!</p>
       <div class="highlight-box">
         <h3 style="margin:0 0 10px;color:${PLATAPAY_BRAND_COLOR};">Your Next Steps</h3>
-        <div class="service-item">1️⃣ Log in to your Agent Panel</div>
-        <div class="service-item">2️⃣ Complete your profile setup</div>
-        <div class="service-item">3️⃣ Watch the training videos</div>
-        <div class="service-item">4️⃣ Start processing transactions!</div>
+        <div class="service-item">1. Log in to your Agent Panel</div>
+        <div class="service-item">2. Complete your profile setup</div>
+        <div class="service-item">3. Watch the training videos</div>
+        <div class="service-item">4. Start processing transactions!</div>
       </div>
       <p>Welcome to a network of <strong>80,000+ agents</strong> serving communities across the Philippines!</p>
       <div class="note"><p><strong>Support:</strong> Call/Viber us at <strong>+639176851216</strong> or email <a href="mailto:marketing@innovatehub.ph">marketing@innovatehub.ph</a> anytime.</p></div>`
@@ -1668,20 +1670,20 @@ async function enrollIn7DayDrip(contact, business, isAgentLead) {
 
     const firstName = contact.get('firstName') || '';
     const drip = isAgentLead ? [
-      { day: 0, template: 'welcome_agent', subject: 'Welcome to PlataPay! 🎉' },
-      { day: 1, template: 'drip_day1_earnings', subject: '💰 How Much Can You Really Earn?' },
-      { day: 3, template: 'drip_day3_success', subject: '🌟 Real Agents, Real Success' },
-      { day: 5, template: 'drip_day5_franchise', subject: '📦 Which Package Is Right For You?' },
-      { day: 7, template: 'drip_day7_final', subject: '⏰ Your PlataPay Journey Awaits' },
+      { day: 0, template: 'welcome_agent', subject: 'Welcome to PlataPay! ' },
+      { day: 1, template: 'drip_day1_earnings', subject: 'How Much Can You Really Earn?' },
+      { day: 3, template: 'drip_day3_success', subject: 'Real Agents, Real Success' },
+      { day: 5, template: 'drip_day5_franchise', subject: 'Which Package Is Right For You?' },
+      { day: 7, template: 'drip_day7_final', subject: 'Your PlataPay Journey Awaits' },
     ] : [
       { day: 0, template: 'welcome_customer', subject: 'Welcome to PlataPay!' },
       { day: 3, template: 'custom', subject: 'Find a PlataPay Agent Near You', data: { name: firstName, content: `
         <p>Looking for convenient payment services in your area?</p>
         <div class="highlight-box">
-          <div class="service-item">💡 Bills Payment</div>
-          <div class="service-item">📱 E-Loading</div>
-          <div class="service-item">💸 Remittance</div>
-          <div class="service-item">🏛️ Government Payments</div>
+          <div class="service-item">Bills Payment</div>
+          <div class="service-item">E-Loading</div>
+          <div class="service-item">Remittance</div>
+          <div class="service-item">Government Payments</div>
         </div>
         <div style="text-align:center;margin:30px 0;">
           <a href="https://platapay.ph/agents" class="button">Find Nearest Agent</a>
@@ -1735,7 +1737,7 @@ async function processNewLead(fbLead, business) {
     fbLead.set('leadScoreTier', scoreResult.tier);
     fbLead.set('leadScoreReasons', scoreResult.reasons);
     if (scoreResult.isHot) {
-      console.log(`[Lead] 🔥 HOT LEAD detected! Score: ${scoreResult.score}, Reasons: ${scoreResult.reasons.join(', ')}`);
+      console.log(`[Lead] HOT LEAD detected! Score: ${scoreResult.score}, Reasons: ${scoreResult.reasons.join(', ')}`);
     }
 
     // Find or create contact
@@ -1845,7 +1847,7 @@ async function processNewLead(fbLead, business) {
     
     // Log hot leads for priority follow-up
     if (scoreResult.isHot) {
-      console.log(`[processNewLead] 🔥 HOT LEAD: ${email || phone} - Score: ${scoreResult.score}`);
+      console.log(`[processNewLead] HOT LEAD: ${email || phone} - Score: ${scoreResult.score}`);
     }
 
     // Auto-enroll in NurtureSequence
@@ -2280,7 +2282,7 @@ app.post('/api/webinar/register', async (req, res) => {
       to: email,
       template: 'webinar_registration',
       data: { name, webinarDate, webinarTime, meetingLink, meetingId, passcode, platform: platform || 'Zoom' },
-      subject: '✅ Webinar Registration Confirmed!'
+      subject: 'Webinar Registration Confirmed!'
     });
 
     // Schedule follow-up email 1 hour after webinar (assume webinar is 1 hour)
@@ -2296,7 +2298,7 @@ app.post('/api/webinar/register', async (req, res) => {
         to: email,
         template: 'webinar_followup',
         data: { name, webinarTitle: 'PlataPay Business Orientation' },
-        subject: 'Thanks for Attending! 🎉'
+        subject: 'Thanks for Attending! '
       });
       await scheduledAction.save(null, { useMasterKey: true });
     }
@@ -2595,13 +2597,13 @@ app.get('/demo', (req, res) => {
 <div class="log"><h2>Server Log</h2><div id="log-entries"></div></div>
 </div>
 <script>
-const botResponses={agent:["Interested to become a PlataPay Agent? Great choice! 💼\\n\\nAs a PlataPay agent, you can earn commissions from e-loading, bills payment, remittance, and more!","What would you like to know?\\n• How to Apply\\n• Requirements\\n• Earnings Potential"],bills:["Welcome to PlataPay! 🎉 We offer:\\n\\n💡 Bills Payment — electric, water, internet, cable\\n📱 E-Loading — all networks\\n💸 Remittance — send money nationwide\\n💳 E-Wallet — cashless payments","How can we help you today?"],earnings:["💰 PlataPay Agent Earnings:\\n\\nAverage monthly income: ₱15,000 – ₱50,000+\\n\\nYou earn commissions on every transaction:\\n• E-Load: ₱1-3 per transaction\\n• Bills Payment: ₱5-15 per transaction\\n• Remittance: ₱10-25 per transaction\\n• E-Wallet: ₱2-5 per transaction"],requirements:["📋 PlataPay Agent Requirements:\\n\\n1. Valid government ID\\n2. Smartphone with internet\\n3. Small starting capital (₱1,000 min)\\n4. Business location (optional)\\n5. Completed online training"],load:["Welcome to PlataPay! 🎉 We offer:\\n\\n💡 Bills Payment\\n📱 E-Loading — all networks\\n💸 Remittance\\n💳 E-Wallet","How can we help you today?"]};
+const botResponses={agent:["Interested to become a PlataPay Agent? Great choice! 💼\\n\\nAs a PlataPay agent, you can earn commissions from e-loading, bills payment, remittance, and more!","What would you like to know?\\n• How to Apply\\n• Requirements\\n• Earnings Potential"],bills:["Welcome to PlataPay!  We offer:\\n\\nBills Payment — electric, water, internet, cable\\nE-Loading — all networks\\nRemittance — send money nationwide\\n💳 E-Wallet — cashless payments","How can we help you today?"],earnings:["PlataPay Agent Earnings:\\n\\nAverage monthly income: ₱15,000 – ₱50,000+\\n\\nYou earn commissions on every transaction:\\n• E-Load: ₱1-3 per transaction\\n• Bills Payment: ₱5-15 per transaction\\n• Remittance: ₱10-25 per transaction\\n• E-Wallet: ₱2-5 per transaction"],requirements:["PlataPay Agent Requirements:\\n\\n1. Valid government ID\\n2. Smartphone with internet\\n3. Small starting capital (₱1,000 min)\\n4. Business location (optional)\\n5. Completed online training"],load:["Welcome to PlataPay!  We offer:\\n\\nBills Payment\\nE-Loading — all networks\\nRemittance\\n💳 E-Wallet","How can we help you today?"]};
 const chat=document.getElementById('chat'),logEl=document.getElementById('log-entries');
 function addLog(t){const d=new Date().toLocaleTimeString();logEl.innerHTML+='<div class="log-line">['+d+'] '+t+'</div>';logEl.scrollTop=logEl.scrollHeight}
 function addMsg(text,type){const d=document.createElement('div');d.className='msg '+type;const t=new Date().toLocaleTimeString();d.innerHTML='<div class="bubble">'+text.replace(/\\n/g,'<br>')+'</div><div class="meta">'+t+'</div>';chat.appendChild(d);chat.scrollTop=chat.scrollHeight}
 function sendMsg(){const inp=document.getElementById('msg-input'),text=inp.value.trim();if(!text)return;inp.value='';addMsg(text,'user');addLog('[Webhook] Received message: "'+text+'"');addLog('[Webhook] Logged to WebhookLog');
 const key=Object.keys(botResponses).find(k=>text.toLowerCase().includes(k));
-setTimeout(()=>{addLog('[Bot] Contact found/created');if(key){addLog('[Bot] Matched flow for keyword: "'+key+'"');botResponses[key].forEach((r,i)=>{setTimeout(()=>{addMsg(r,'bot');addLog('[SendAPI] Message sent successfully')},i*800)})}else{addMsg("Thanks for messaging PlataPay! 😊 How can we help you?\\n\\nType: agent, bills, load, or earnings","bot");addLog('[Bot] No flow matched — sent default greeting')}},600)}
+setTimeout(()=>{addLog('[Bot] Contact found/created');if(key){addLog('[Bot] Matched flow for keyword: "'+key+'"');botResponses[key].forEach((r,i)=>{setTimeout(()=>{addMsg(r,'bot');addLog('[SendAPI] Message sent successfully')},i*800)})}else{addMsg("Thanks for messaging PlataPay!  How can we help you?\\n\\nType: agent, bills, load, or earnings","bot");addLog('[Bot] No flow matched — sent default greeting')}},600)}
 addLog('[Server] PlataPay Webhook Server running');addLog('[Server] Webhook URL: https://webhook.innoserver.cloud/facebook/webhook');addLog('[Server] Connected to Facebook Page: PlataPay (267252936481761)');
 </script></body></html>`);
 });
@@ -2795,7 +2797,7 @@ async function checkConversationSLA() {
               name: 'Admin',
               content: `
                 <div class="note" style="background-color:#fff3cd;border-left-color:#ffc107;">
-                  <p><strong>⚠️ SLA Alert: Conversation Pending ${hoursPending} Hours</strong></p>
+                  <p><strong>SLA Alert: Conversation Pending ${hoursPending} Hours</strong></p>
                 </div>
                 <div class="highlight-box">
                   <div class="service-item"><strong>Contact:</strong> ${contactName}</div>
@@ -2809,7 +2811,7 @@ async function checkConversationSLA() {
                 </div>
               `
             },
-            subject: `⚠️ SLA Alert: ${contactName} waiting ${hoursPending} hours for response`
+            subject: `SLA Alert: ${contactName} waiting ${hoursPending} hours for response`
           });
           
           conv.set('slaAlertSent', true);
@@ -2872,7 +2874,7 @@ async function checkConversationSLA() {
             name: 'Admin',
             content: `
               <div class="note" style="background-color:#f8d7da;border-left-color:#dc3545;">
-                <p><strong>🚨 ESCALATION: Conversation Pending 24+ Hours</strong></p>
+                <p><strong>ESCALATION: Conversation Pending 24+ Hours</strong></p>
               </div>
               <div class="highlight-box">
                 <div class="service-item"><strong>Contact:</strong> ${contactName}</div>
@@ -2887,7 +2889,7 @@ async function checkConversationSLA() {
               </div>
             `
           },
-          subject: `🚨 ESCALATION: ${contactName} waiting 24+ hours — apology sent`
+          subject: `ESCALATION: ${contactName} waiting 24+ hours — apology sent`
         });
 
         conv.set('slaEscalated', true);
@@ -3377,17 +3379,17 @@ async function enrollInPostOnboardingNurture(lead, business) {
       { 
         day: 1, 
         template: 'custom', 
-        subject: '🚀 Getting Started: Your First Day as a PlataPay Agent',
+        subject: 'Getting Started: Your First Day as a PlataPay Agent',
         channel: 'both',
         content: `
-          <p>Congratulations on your first day as a PlataPay agent, ${firstName || 'partner'}! 🎉</p>
+          <p>Congratulations on your first day as a PlataPay agent, ${firstName || 'partner'}! </p>
           <div class="highlight-box">
             <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📚 Quick Start Checklist</h3>
-            <div class="service-item">1️⃣ Log in to your Agent Panel at platapay.ph</div>
-            <div class="service-item">2️⃣ Complete your profile setup</div>
-            <div class="service-item">3️⃣ Watch the 3-minute training video</div>
-            <div class="service-item">4️⃣ Process your first test transaction</div>
-            <div class="service-item">5️⃣ Invite your first customer!</div>
+            <div class="service-item">1. Log in to your Agent Panel at platapay.ph</div>
+            <div class="service-item">2. Complete your profile setup</div>
+            <div class="service-item">3. Watch the 3-minute training video</div>
+            <div class="service-item">4. Process your first test transaction</div>
+            <div class="service-item">5. Invite your first customer!</div>
           </div>
           <div class="note">
             <p><strong>Pro Tip:</strong> Start with e-loading — it's the easiest service and most in-demand!</p>
@@ -3396,20 +3398,20 @@ async function enrollInPostOnboardingNurture(lead, business) {
             <a href="https://platapay.ph/training" class="button">Watch Training Videos</a>
           </div>
         `,
-        messengerText: `🚀 Day 1 Tips!\n\n1️⃣ Log in to Agent Panel\n2️⃣ Complete your profile\n3️⃣ Watch 3-min training\n4️⃣ Process test transaction\n5️⃣ Invite first customer!\n\nPro tip: Start with e-loading — easiest & most popular!`
+        messengerText: `Day 1 Tips!\n\n1. Log in to Agent Panel\n2. Complete your profile\n3. Watch 3-min training\n4. Process test transaction\n5. Invite first customer!\n\nPro tip: Start with e-loading — easiest & most popular!`
       },
       { 
         day: 7, 
         template: 'custom', 
-        subject: '📊 Week 1 Check-in: How Are You Doing?',
+        subject: 'Week 1 Check-in: How Are You Doing?',
         channel: 'both',
         content: `
           <p>Hi ${firstName || 'there'}! It's been one week since you joined PlataPay. How's it going? 🙌</p>
           <div class="highlight-box">
             <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">💬 Quick Questions</h3>
-            <div class="service-item">✅ Have you processed your first transactions?</div>
-            <div class="service-item">✅ Any questions about the panel or services?</div>
-            <div class="service-item">✅ Need help with marketing your new business?</div>
+            <div class="service-item">Have you processed your first transactions?</div>
+            <div class="service-item">Any questions about the panel or services?</div>
+            <div class="service-item">Need help with marketing your new business?</div>
           </div>
           <p>We're here to help you succeed! Reply to this email or message us on Messenger if you need assistance.</p>
           <div class="note">
@@ -3424,20 +3426,20 @@ async function enrollInPostOnboardingNurture(lead, business) {
             <a href="https://m.me/PlataPay?ref=SUPPORT" class="button">Get Help Now</a>
           </div>
         `,
-        messengerText: `📊 Week 1 Check-in!\n\nHow are things going? Quick questions:\n\n✅ Processed first transactions?\n✅ Any questions about the panel?\n✅ Need marketing help?\n\nReply here or call +639176851216 for support!`
+        messengerText: `Week 1 Check-in!\n\nHow are things going? Quick questions:\n\nProcessed first transactions?\nAny questions about the panel?\nNeed marketing help?\n\nReply here or call +639176851216 for support!`
       },
       { 
         day: 30, 
         template: 'custom', 
-        subject: '🏆 30-Day Review: Celebrate Your Progress!',
+        subject: '30-Day Review: Celebrate Your Progress!',
         channel: 'both',
         content: `
-          <p>Congratulations, ${firstName || 'Agent'}! 🎉 You've been a PlataPay agent for 30 days!</p>
+          <p>Congratulations, ${firstName || 'Agent'}!  You've been a PlataPay agent for 30 days!</p>
           <div class="highlight-box">
-            <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">🏆 Time for a Review</h3>
+            <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Time for a Review</h3>
             <p>Let's check your progress and see how we can help you grow even more:</p>
-            <div class="service-item">📊 <strong>Transactions:</strong> How many have you processed?</div>
-            <div class="service-item">💰 <strong>Earnings:</strong> Are you hitting your targets?</div>
+            <div class="service-item"><strong>Transactions:</strong> How many have you processed?</div>
+            <div class="service-item"><strong>Earnings:</strong> Are you hitting your targets?</div>
             <div class="service-item">📈 <strong>Growth:</strong> Any services you haven't tried yet?</div>
           </div>
           <p>Top agents at the 30-day mark are usually doing 50+ transactions/week. Where are you?</p>
@@ -3453,7 +3455,7 @@ async function enrollInPostOnboardingNurture(lead, business) {
             <a href="tel:+639176851216" class="button">📞 Schedule a Review Call</a>
           </div>
         `,
-        messengerText: `🏆 30-Day Review!\n\nCongratulations on 1 month as a PlataPay Agent! 🎉\n\nLet's review your progress:\n📊 Transactions processed?\n💰 Hitting earnings targets?\n📈 Tried all services?\n\nTop agents do 50+ transactions/week. How are you doing?\n\nReply "REVIEW" to schedule a call!`
+        messengerText: `30-Day Review!\n\nCongratulations on 1 month as a PlataPay Agent! \n\nLet's review your progress:\nTransactions processed?\nHitting earnings targets?\n📈 Tried all services?\n\nTop agents do 50+ transactions/week. How are you doing?\n\nReply "REVIEW" to schedule a call!`
       }
     ];
 
@@ -3674,9 +3676,9 @@ async function sendAdminDailyDigest() {
       <p>Good morning! Here's your PlataPay daily digest for ${now.toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}:</p>
       
       <div class="highlight-box">
-        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📊 Daily Summary</h3>
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Daily Summary</h3>
         <div class="service-item">🆕 <strong>New Leads (24h):</strong> ${newLeadsCount}</div>
-        <div class="service-item">⏳ <strong>Pending Conversations:</strong> ${pendingConversations} ${pendingConversations > 0 ? '⚠️' : '✅'}</div>
+        <div class="service-item"> <strong>Pending Conversations:</strong> ${pendingConversations} ${pendingConversations > 0 ? '⚠️' : '✅'}</div>
         <div class="service-item">🔄 <strong>Active Nurture Sequences:</strong> ${activeNurtures}</div>
         <div class="service-item">📧 <strong>Emails Sent (24h):</strong> ${emailsSent}</div>
       </div>
@@ -3684,15 +3686,15 @@ async function sendAdminDailyDigest() {
       <div class="highlight-box">
         <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📈 Agent Pipeline</h3>
         <div class="service-item">📥 Inquiry: ${stageCounts.inquiry || 0}</div>
-        <div class="service-item">📝 Application: ${stageCounts.application || 0}</div>
+        <div class="service-item">Application: ${stageCounts.application || 0}</div>
         <div class="service-item">🔍 Screening: ${stageCounts.screening || 0}</div>
         <div class="service-item">📚 Training: ${stageCounts.training || 0}</div>
-        <div class="service-item">✅ Onboarded: ${stageCounts.onboarded || 0}</div>
+        <div class="service-item">Onboarded: ${stageCounts.onboarded || 0}</div>
       </div>
 
       ${pendingConversations > 5 ? `
       <div class="note">
-        <p><strong>⚠️ Action Required:</strong> You have ${pendingConversations} pending conversations. Please check the dashboard and respond to customers waiting for human assistance.</p>
+        <p><strong>Action Required:</strong> You have ${pendingConversations} pending conversations. Please check the dashboard and respond to customers waiting for human assistance.</p>
       </div>
       ` : ''}
 
@@ -3705,7 +3707,7 @@ async function sendAdminDailyDigest() {
       to: 'admin@innovatehub.ph',
       template: 'custom',
       data: { name: 'Admin', content: digestHtml },
-      subject: `📊 PlataPay Daily Digest — ${newLeadsCount} new leads, ${pendingConversations} pending`
+      subject: `PlataPay Daily Digest — ${newLeadsCount} new leads, ${pendingConversations} pending`
     });
 
     console.log(`[Digest] Daily digest sent: ${newLeadsCount} leads, ${pendingConversations} pending, ${emailsSent} emails`);
@@ -3760,8 +3762,8 @@ async function processReengagement() {
         
         // Send re-engagement message
         const reengageMessage = firstName 
-          ? `Hi ${firstName}! 👋 We miss you at PlataPay!\n\nHere's what's new:\n✨ 30+ new branch openings nationwide\n💰 Updated commission rates\n📱 New mobile app features\n\nReady to get back in? Tap below to explore!`
-          : `Hi there! 👋 We miss you at PlataPay!\n\nHere's what's new:\n✨ 30+ new branch openings nationwide\n💰 Updated commission rates\n📱 New mobile app features\n\nReady to get back in? Tap below to explore!`;
+          ? `Hi ${firstName}! 👋 We miss you at PlataPay!\n\nHere's what's new:\n 30+ new branch openings nationwide\nUpdated commission rates\nNew mobile app features\n\nReady to get back in? Tap below to explore!`
+          : `Hi there! 👋 We miss you at PlataPay!\n\nHere's what's new:\n 30+ new branch openings nationwide\nUpdated commission rates\nNew mobile app features\n\nReady to get back in? Tap below to explore!`;
 
         await callSendApiWithTag(token, psid, {
           text: reengageMessage,

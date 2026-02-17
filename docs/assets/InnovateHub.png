@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PlataPay - Financial Freedom at Your Fingertips</title>
+    <meta name="description" content="Experience seamless digital payments and smart financial solutions with PlataPay" />
+    <meta name="author" content="PlataPay" />
+    <meta property="og:image" content="/lovable-uploads/2ea0f2a8-30d6-4dc7-a90c-64114f4b68d7.png" />
+    <link rel="icon" type="image/png" href="/lovable-uploads/de5508df-c97c-4a92-8c31-9c44cab73599.png" />
+    <script type="module" crossorigin src="/assets/index-Dwr_c6Ub.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-tAb5Mb0C.css">
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
+  </body>
+</html>
