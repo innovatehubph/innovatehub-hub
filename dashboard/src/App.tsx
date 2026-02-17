@@ -20,6 +20,8 @@ import AIWorkshop from './pages/AIWorkshop'
 import LeadMagnets from './pages/LeadMagnets'
 import NurtureSequences from './pages/NurtureSequences'
 import AgentPipeline from './pages/AgentPipeline'
+import CompetitiveIntel from './pages/CompetitiveIntel'
+import PredictiveAnalytics from './pages/PredictiveAnalytics'
 
 export default function App() {
   const [activeBusiness, setActiveBusiness] = useState('')
@@ -64,6 +66,8 @@ export default function App() {
         <Route path="/lead-magnets" element={<LeadMagnets businessId={activeBusiness} />} />
         <Route path="/nurture-sequences" element={<NurtureSequences businessId={activeBusiness} />} />
         <Route path="/agent-pipeline" element={<AgentPipeline businessId={activeBusiness} />} />
+        <Route path="/competitive-intel" element={<CompetitiveIntel />} />
+        <Route path="/predictive-analytics" element={<PredictiveAnalytics />} />
         <Route path="/ai-workshop" element={<AIWorkshop businessId={activeBusiness} />} />
         <Route path="/settings" element={<Settings businessId={activeBusiness} onBusinessChange={setActiveBusiness} />} />
       </Routes>

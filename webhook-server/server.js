@@ -4661,6 +4661,148 @@ app.get('/api/analytics/budget-optimization', async (req, res) => {
 });
 
 // =============================================================================
+// Weekly Performance Report (Cron Job)
+// =============================================================================
+
+async function sendWeeklyPerformanceReport() {
+  console.log('[Weekly] Generating weekly performance report...');
+  
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  
+  try {
+    // This week's leads
+    const thisWeekQuery = new Parse.Query('FbLead');
+    thisWeekQuery.greaterThan('createdAt', weekAgo);
+    const thisWeekLeads = await thisWeekQuery.count({ useMasterKey: true });
+    
+    // Last week's leads (for comparison)
+    const lastWeekQuery = new Parse.Query('FbLead');
+    lastWeekQuery.greaterThan('createdAt', twoWeeksAgo);
+    lastWeekQuery.lessThanOrEqualTo('createdAt', weekAgo);
+    const lastWeekLeads = await lastWeekQuery.count({ useMasterKey: true });
+    
+    // Lead change percentage
+    const leadChange = lastWeekLeads > 0 
+      ? Math.round(((thisWeekLeads - lastWeekLeads) / lastWeekLeads) * 100)
+      : 0;
+    
+    // Hot leads this week
+    const hotLeadQuery = new Parse.Query('FbLead');
+    hotLeadQuery.greaterThan('createdAt', weekAgo);
+    hotLeadQuery.equalTo('leadScoreTier', 'hot');
+    const hotLeads = await hotLeadQuery.count({ useMasterKey: true });
+    
+    // Emails sent this week
+    const emailQuery = new Parse.Query('EmailLog');
+    emailQuery.greaterThan('sentAt', weekAgo);
+    emailQuery.equalTo('status', 'sent');
+    const emailsSent = await emailQuery.count({ useMasterKey: true });
+    
+    // Pipeline movement
+    const pipelineQuery = new Parse.Query('FbLead');
+    pipelineQuery.exists('pipelineStage');
+    const pipelineLeads = await pipelineQuery.find({ useMasterKey: true });
+    const stageCounts = {};
+    pipelineLeads.forEach(l => {
+      const stage = l.get('pipelineStage') || 'inquiry';
+      stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+    });
+    
+    // Pending conversations
+    const convQuery = new Parse.Query('Conversation');
+    convQuery.equalTo('status', 'pending');
+    const pendingConversations = await convQuery.count({ useMasterKey: true });
+    
+    // SLA compliance
+    const respondedQuery = new Parse.Query('Conversation');
+    respondedQuery.greaterThan('lastRespondedAt', weekAgo);
+    respondedQuery.exists('lastRespondedAt');
+    const respondedConvs = await respondedQuery.find({ useMasterKey: true });
+    let withinSLA = 0;
+    respondedConvs.forEach(conv => {
+      const created = conv.get('createdAt');
+      const responded = conv.get('lastRespondedAt');
+      if (responded && created) {
+        const responseTimeHours = (responded - created) / (60 * 60 * 1000);
+        if (responseTimeHours <= 5) withinSLA++;
+      }
+    });
+    const slaCompliance = respondedConvs.length > 0 
+      ? Math.round((withinSLA / respondedConvs.length) * 100)
+      : 100;
+
+    // Competitors tracked
+    const compQuery = new Parse.Query('Competitor');
+    compQuery.equalTo('isActive', true);
+    const competitorCount = await compQuery.count({ useMasterKey: true });
+
+    // Build email content
+    const reportHtml = `
+      <p>Here's your weekly marketing performance summary for the week ending ${now.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}:</p>
+      
+      <div class="highlight-box">
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Lead Generation</h3>
+        <div class="service-item"><strong>New Leads:</strong> ${thisWeekLeads} ${leadChange >= 0 ? `(+${leadChange}%)` : `(${leadChange}%)`} vs last week</div>
+        <div class="service-item"><strong>Hot Leads:</strong> ${hotLeads} (score 50+)</div>
+        <div class="service-item"><strong>Hot Lead Rate:</strong> ${thisWeekLeads > 0 ? Math.round((hotLeads / thisWeekLeads) * 100) : 0}%</div>
+      </div>
+
+      <div class="highlight-box">
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Pipeline Status</h3>
+        <div class="service-item"><strong>Inquiry:</strong> ${stageCounts.inquiry || 0}</div>
+        <div class="service-item"><strong>Application:</strong> ${stageCounts.application || 0}</div>
+        <div class="service-item"><strong>Screening:</strong> ${stageCounts.screening || 0}</div>
+        <div class="service-item"><strong>Training:</strong> ${stageCounts.training || 0}</div>
+        <div class="service-item"><strong>Onboarded:</strong> ${stageCounts.onboarded || 0}</div>
+      </div>
+
+      <div class="highlight-box">
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Engagement</h3>
+        <div class="service-item"><strong>Emails Sent:</strong> ${emailsSent}</div>
+        <div class="service-item"><strong>Pending Conversations:</strong> ${pendingConversations}</div>
+        <div class="service-item"><strong>SLA Compliance:</strong> ${slaCompliance}%</div>
+      </div>
+
+      <div class="highlight-box">
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Competitive Intelligence</h3>
+        <div class="service-item"><strong>Competitors Tracked:</strong> ${competitorCount}</div>
+      </div>
+
+      ${pendingConversations > 10 ? `
+      <div class="note">
+        <p><strong>Action Required:</strong> You have ${pendingConversations} pending conversations. Please prioritize response to maintain customer satisfaction.</p>
+      </div>
+      ` : ''}
+
+      <div class="button-wrapper">
+        <a href="https://dashboard.innoserver.cloud" class="button">View Full Dashboard</a>
+      </div>
+    `;
+
+    await sendEmail({
+      to: 'admin@innovatehub.ph',
+      template: 'custom',
+      data: { name: 'Admin', content: reportHtml },
+      subject: `Weekly Report: ${thisWeekLeads} leads, ${slaCompliance}% SLA — Week of ${now.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}`
+    });
+
+    console.log(`[Weekly] Report sent: ${thisWeekLeads} leads, ${hotLeads} hot, ${emailsSent} emails`);
+    return { success: true, thisWeekLeads, hotLeads, emailsSent, slaCompliance };
+  } catch (err) {
+    console.error('[Weekly] Report error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// Manual trigger endpoint
+app.post('/api/send-weekly-report', async (req, res) => {
+  const result = await sendWeeklyPerformanceReport();
+  res.json(result);
+});
+
+// =============================================================================
 // Start Server + All Cron Jobs
 // =============================================================================
 
@@ -4672,6 +4814,7 @@ app.listen(PORT, () => {
   console.log(`[Server] Daily digest runs at 8 AM Manila time (0:00 UTC)`);
   console.log(`[Server] Re-engagement check runs daily at 10 AM Manila time (2:00 UTC)`);
   console.log(`[Server] SLA check runs every 30 minutes`);
+  console.log(`[Server] Weekly performance report runs Mondays at 8 AM Manila time`);
 
   // Run nurture processor on interval (every hour)
   setInterval(() => {
@@ -4749,4 +4892,32 @@ app.listen(PORT, () => {
       console.error('[SLA] Startup run error:', err.message);
     });
   }, 20000);
+
+  // Weekly performance report on Mondays at 8 AM Manila time
+  const scheduleWeeklyReport = () => {
+    const now = new Date();
+    const manila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+    const target = new Date(manila);
+    
+    // Find next Monday
+    const daysUntilMonday = (8 - manila.getDay()) % 7 || 7;
+    target.setDate(target.getDate() + daysUntilMonday);
+    target.setHours(8, 0, 0, 0);
+    
+    if (manila >= target) {
+      target.setDate(target.getDate() + 7);
+    }
+    
+    const msUntil = target.getTime() - manila.getTime();
+    console.log(`[Weekly] Next report in ${Math.round(msUntil / (60 * 60 * 1000))} hours (Monday 8 AM)`);
+    
+    setTimeout(() => {
+      sendWeeklyPerformanceReport().catch(err => console.error('[Weekly] Error:', err.message));
+      // Reschedule for next week
+      setInterval(() => {
+        sendWeeklyPerformanceReport().catch(err => console.error('[Weekly] Error:', err.message));
+      }, 7 * 24 * 60 * 60 * 1000);
+    }, msUntil);
+  };
+  scheduleWeeklyReport();
 });

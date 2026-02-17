@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Building2, MessageSquare, Bot, FileText,
   Megaphone, ShoppingBag, Package, Key, Webhook, Users,
   Facebook, Settings, ChevronLeft, ChevronRight, Menu, Wand2,
-  Magnet, Mail, UserCheck, LogOut
+  Magnet, Mail, UserCheck, LogOut, Target, TrendingUp
 } from 'lucide-react';
 import Parse, { BUSINESSES } from '../config/parse';
 import ChatWidget from './ChatWidget';
@@ -18,6 +18,8 @@ const navItems = [
   { path: '/lead-magnets', label: 'Lead Magnets', icon: Magnet },
   { path: '/nurture-sequences', label: 'Nurture Sequences', icon: Mail },
   { path: '/agent-pipeline', label: 'Agent Pipeline', icon: UserCheck },
+  { path: '/competitive-intel', label: 'Competitive Intel', icon: Target },
+  { path: '/predictive-analytics', label: 'Predictive Analytics', icon: TrendingUp },
   { path: '/campaigns', label: 'Ads & Campaigns', icon: Megaphone },
   { path: '/products', label: 'Products', icon: ShoppingBag },
   { path: '/orders', label: 'Orders', icon: Package },
