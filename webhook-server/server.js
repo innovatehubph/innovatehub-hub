@@ -591,6 +591,60 @@ const EMAIL_TEMPLATES = {
       </div>
 
       <p style="text-align:center;font-size:14px;color:#666;">Not ready yet? No problem — we'll be here when you are. </p>`
+  }),
+
+  // 17. Booking Confirmation Email
+  booking_confirmation: (data) => emailBaseTemplate({
+    title: 'Your PlataPay Orientation is Confirmed!',
+    preheader: `See you on ${data.date} at ${data.timeSlot}`,
+    bodyContent: `
+      <p>Hi ${data.name}!</p>
+      <p>Great news! Your PlataPay orientation has been scheduled.</p>
+      
+      <div class="highlight-box" style="text-align:center;">
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📅 Appointment Details</h3>
+        <div style="font-size:24px;font-weight:bold;color:${PLATAPAY_BRAND_COLOR};margin:10px 0;">${data.date}</div>
+        <div style="font-size:20px;margin:10px 0;">🕐 ${data.timeSlot}</div>
+        <div style="background:#f0f0f0;padding:10px;border-radius:8px;margin:15px 0;">
+          <strong>Confirmation Code:</strong><br>
+          <span style="font-size:28px;font-weight:bold;letter-spacing:3px;color:${PLATAPAY_BRAND_COLOR};">${data.confirmationCode}</span>
+        </div>
+      </div>
+      
+      <div class="highlight-box">
+        <h4 style="margin:0 0 10px;">📍 Location</h4>
+        <p style="margin:0;">${data.location || 'InnovateHub Office, San Antonio, San Pascual, Batangas'}</p>
+        <p style="margin:10px 0 0;"><a href="${data.mapLink || 'https://maps.app.goo.gl/PErGsbGkAiPVViPS6'}" style="color:${PLATAPAY_BRAND_COLOR};">Open in Google Maps →</a></p>
+      </div>
+      
+      <div class="highlight-box">
+        <h4 style="margin:0 0 10px;">📝 What to Bring</h4>
+        <p style="margin:0;">• Valid ID<br>• Questions about the franchise<br>• Notebook (optional)</p>
+      </div>
+      
+      <div class="button-wrapper">
+        <a href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=PlataPay+Orientation&dates=${data.calendarDate || ''}&details=Confirmation+Code:+${data.confirmationCode}&location=InnovateHub+San+Antonio+San+Pascual+Batangas" class="button">Add to Google Calendar</a>
+      </div>
+      
+      <div class="note">
+        <p><strong>Need to reschedule?</strong> Reply to this email or call +639176851216 at least 24 hours before your appointment.</p>
+      </div>`
+  }),
+
+  // 18. Booking Cancelled Email
+  booking_cancelled: (data) => emailBaseTemplate({
+    title: 'Booking Cancelled',
+    preheader: 'Your PlataPay orientation has been cancelled',
+    bodyContent: `
+      <p>Hi ${data.name},</p>
+      <p>Your PlataPay orientation scheduled for <strong>${data.date}</strong> at <strong>${data.timeSlot}</strong> has been cancelled.</p>
+      <p>Confirmation code: <strong>${data.confirmationCode}</strong></p>
+      
+      <div class="button-wrapper">
+        <a href="https://m.me/platapayph" class="button">Reschedule on Messenger</a>
+      </div>
+      
+      <p>If you didn't request this cancellation, please contact us immediately at +639176851216.</p>`
   })
 };
 
@@ -6203,3 +6257,206 @@ app.get('/api/automation/quick-image/:scene', async (req, res) => {
 
 console.log('[Server] Automation endpoints loaded');
 
+
+// =============================================================================
+// Booking / Scheduling System
+// =============================================================================
+
+// Available time slots for orientations
+const ORIENTATION_SLOTS = ['10:00 AM', '2:00 PM', '5:00 PM', '8:00 PM'];
+const ORIENTATION_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// Create a booking
+app.post('/api/bookings', async (req, res) => {
+  try {
+    const { name, email, phone, date, timeSlot, type, notes, contactId } = req.body;
+    
+    if (!name || !email || !date || !timeSlot) {
+      return res.status(400).json({ error: 'name, email, date, and timeSlot are required' });
+    }
+    
+    // Create booking record
+    const booking = new Parse.Object('Booking');
+    booking.set('name', name);
+    booking.set('email', email);
+    booking.set('phone', phone || '');
+    booking.set('date', date); // Format: 2026-02-18
+    booking.set('timeSlot', timeSlot); // Format: 10:00 AM
+    booking.set('type', type || 'orientation'); // orientation, meeting, presentation
+    booking.set('notes', notes || '');
+    booking.set('status', 'pending'); // pending, confirmed, cancelled, completed
+    booking.set('confirmationCode', generateConfirmationCode());
+    
+    if (contactId) {
+      const contactPtr = new Parse.Object('MessengerContact');
+      contactPtr.id = contactId;
+      booking.set('contact', contactPtr);
+    }
+    
+    await booking.save(null, { useMasterKey: true });
+    
+    // Send confirmation email
+    const confirmationCode = booking.get('confirmationCode');
+    const dateFormatted = new Date(date).toLocaleDateString('en-PH', { 
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+    });
+    
+    await sendEmail({
+      to: email,
+      template: 'booking_confirmation',
+      subject: `PlataPay Orientation Confirmed - ${dateFormatted} at ${timeSlot}`,
+      data: {
+        name,
+        date: dateFormatted,
+        timeSlot,
+        confirmationCode,
+        type: type || 'orientation',
+        location: 'InnovateHub Office, San Antonio, San Pascual, Batangas',
+        mapLink: 'https://maps.app.goo.gl/PErGsbGkAiPVViPS6'
+      }
+    });
+    
+    console.log('[Booking] Created:', confirmationCode, 'for', name, 'on', date, timeSlot);
+    
+    res.json({ 
+      success: true, 
+      bookingId: booking.id,
+      confirmationCode,
+      message: 'Booking confirmed! Check your email for details.'
+    });
+  } catch (err) {
+    console.error('[Booking] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate 6-character confirmation code
+function generateConfirmationCode() {
+  return 'PP' + Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+// Get available slots for a date
+app.get('/api/bookings/slots', async (req, res) => {
+  try {
+    const { date } = req.query;
+    if (!date) {
+      return res.json({ 
+        slots: ORIENTATION_SLOTS,
+        days: ORIENTATION_DAYS,
+        note: 'Pass ?date=2026-02-18 to check availability'
+      });
+    }
+    
+    // Check existing bookings for this date
+    const query = new Parse.Query('Booking');
+    query.equalTo('date', date);
+    query.containedIn('status', ['pending', 'confirmed']);
+    const existingBookings = await query.find({ useMasterKey: true });
+    
+    const bookedSlots = existingBookings.map(b => b.get('timeSlot'));
+    const availableSlots = ORIENTATION_SLOTS.filter(s => !bookedSlots.includes(s));
+    
+    res.json({
+      date,
+      availableSlots,
+      bookedSlots,
+      allSlots: ORIENTATION_SLOTS
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// List bookings
+app.get('/api/bookings', async (req, res) => {
+  try {
+    const { date, status, limit = 50 } = req.query;
+    const query = new Parse.Query('Booking');
+    
+    if (date) query.equalTo('date', date);
+    if (status) query.equalTo('status', status);
+    
+    query.descending('createdAt');
+    query.limit(parseInt(limit));
+    
+    const bookings = await query.find({ useMasterKey: true });
+    
+    res.json({
+      success: true,
+      bookings: bookings.map(b => ({
+        id: b.id,
+        name: b.get('name'),
+        email: b.get('email'),
+        phone: b.get('phone'),
+        date: b.get('date'),
+        timeSlot: b.get('timeSlot'),
+        type: b.get('type'),
+        status: b.get('status'),
+        confirmationCode: b.get('confirmationCode'),
+        createdAt: b.createdAt
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update booking status
+app.put('/api/bookings/:id', async (req, res) => {
+  try {
+    const { status, notes } = req.body;
+    const query = new Parse.Query('Booking');
+    const booking = await query.get(req.params.id, { useMasterKey: true });
+    
+    if (status) booking.set('status', status);
+    if (notes) booking.set('notes', notes);
+    
+    await booking.save(null, { useMasterKey: true });
+    
+    // Send status update email if confirmed or cancelled
+    if (status === 'confirmed' || status === 'cancelled') {
+      await sendEmail({
+        to: booking.get('email'),
+        template: status === 'confirmed' ? 'booking_confirmed' : 'booking_cancelled',
+        subject: `PlataPay Booking ${status === 'confirmed' ? 'Confirmed' : 'Cancelled'}`,
+        data: {
+          name: booking.get('name'),
+          date: booking.get('date'),
+          timeSlot: booking.get('timeSlot'),
+          confirmationCode: booking.get('confirmationCode'),
+          status
+        }
+      });
+    }
+    
+    res.json({ success: true, message: 'Booking updated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Cancel booking by confirmation code
+app.post('/api/bookings/cancel', async (req, res) => {
+  try {
+    const { confirmationCode, email } = req.body;
+    
+    const query = new Parse.Query('Booking');
+    query.equalTo('confirmationCode', confirmationCode);
+    if (email) query.equalTo('email', email);
+    
+    const booking = await query.first({ useMasterKey: true });
+    
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    booking.set('status', 'cancelled');
+    await booking.save(null, { useMasterKey: true });
+    
+    res.json({ success: true, message: 'Booking cancelled' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+console.log('[Server] Booking/Scheduling endpoints loaded');
