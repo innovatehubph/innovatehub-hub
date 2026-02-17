@@ -6472,7 +6472,7 @@ console.log('[Server] Booking/Scheduling endpoints loaded');
 // Google Sheets Sync for Leads & Bookings
 // =============================================================================
 
-const GOOGLE_SHEETS_ID = '1tJMLWrGUkraYERwAOeJ6l1WfSfOZ0C9CK1OajeQh0kA';
+const GOOGLE_SHEETS_ID = '1-8koQ65u4aLe4XGKihjQ1Oho2GiHCaodaN3PJK6eKLo';
 const GOOGLE_TOKENS_PATH = '/root/.config/google-workspace-mcp/tokens.json';
 
 async function getGoogleAccessToken() {
@@ -6549,17 +6549,18 @@ async function appendToGoogleSheet(sheetName, values) {
 async function syncLeadToSheets(contact) {
   const now = new Date().toISOString().split('T')[0];
   const values = [
-    now, // Date
-    `${contact.get('firstName') || ''} ${contact.get('lastName') || ''}`.trim() || 'Unknown', // Name
-    contact.get('email') || '', // Email
-    contact.get('phone') || '', // Phone
-    contact.get('location') || '', // Location
-    contact.get('channel') || 'messenger', // Source
-    contact.get('interest') || '', // Interest
-    'New', // Status
-    '', // Comments
-    now, // Last Updated
-    contact.id // Contact ID
+    now, // 📅 Date Captured
+    `${contact.get('firstName') || ''} ${contact.get('lastName') || ''}`.trim() || 'Unknown', // 👤 Name
+    contact.get('email') || '', // 📧 Email
+    contact.get('phone') || '', // 📱 Phone
+    contact.get('location') || '', // 📍 Location
+    contact.get('channel') || 'Messenger', // 💬 Source
+    '', // 🎯 Interest (to be filled)
+    '🆕 New', // 📊 Status
+    '', // 💼 Package Interest
+    '', // 📝 Comments
+    now, // 🔄 Last Updated
+    contact.id // 🔑 Contact ID
   ];
   
   return appendToGoogleSheet('Leads', values);
@@ -6569,15 +6570,16 @@ async function syncLeadToSheets(contact) {
 async function syncBookingToSheets(booking) {
   const now = new Date().toISOString().split('T')[0];
   const values = [
-    now, // Date Booked
-    booking.get('name') || '', // Name
-    booking.get('email') || '', // Email
-    booking.get('phone') || '', // Phone
-    booking.get('date') || '', // Appointment Date
-    booking.get('timeSlot') || '', // Time Slot
-    booking.get('confirmationCode') || '', // Booking Ref
-    booking.get('status') || 'pending', // Status
-    booking.get('notes') || '' // Notes
+    now, // 📅 Date Booked
+    booking.get('name') || '', // 👤 Name
+    booking.get('email') || '', // 📧 Email
+    booking.get('phone') || '', // 📱 Phone
+    booking.get('date') || '', // 🗓️ Appointment Date
+    booking.get('timeSlot') || '', // 🕐 Time Slot
+    booking.get('confirmationCode') || '', // 🎫 Booking Ref
+    '⏳ Pending', // 📊 Status
+    booking.get('notes') || '', // 📝 Notes
+    'Pending' // ✅ Attended
   ];
   
   return appendToGoogleSheet('Bookings', values);
