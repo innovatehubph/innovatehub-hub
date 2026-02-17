@@ -319,6 +319,202 @@ const EMAIL_TEMPLATES = {
       <p>Hi ${data.name || 'there'},</p>
       ${data.content || ''}
       ${data.ctaUrl ? `<div style="text-align:center;margin:30px 0;"><a href="${data.ctaUrl}" class="button">${data.ctaLabel || 'Learn More'}</a></div>` : ''}`
+  }),
+
+  // 11. TIER 2: Webinar Registration Confirmation
+  webinar_registration: (data) => emailBaseTemplate({
+    title: '✅ Webinar Registration Confirmed!',
+    preheader: `You're registered for ${data.webinarTitle || 'our PlataPay Business Orientation'}`,
+    bodyContent: `
+      <p>Hi ${data.name || 'there'}!</p>
+      <p>Great news! Your registration for our <strong>${data.webinarTitle || 'PlataPay Business Orientation'}</strong> is confirmed! 🎉</p>
+      
+      <div class="highlight-box">
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📅 Webinar Details</h3>
+        <div class="service-item">📆 <strong>Date:</strong> ${data.webinarDate || 'To be announced'}</div>
+        <div class="service-item">🕐 <strong>Time:</strong> ${data.webinarTime || 'To be announced'} (Manila Time)</div>
+        <div class="service-item">📍 <strong>Platform:</strong> ${data.platform || 'Zoom/Google Meet'}</div>
+        ${data.meetingLink ? `<div class="service-item">🔗 <strong>Link:</strong> <a href="${data.meetingLink}">${data.meetingLink}</a></div>` : ''}
+        ${data.meetingId ? `<div class="service-item">🆔 <strong>Meeting ID:</strong> ${data.meetingId}</div>` : ''}
+        ${data.passcode ? `<div class="service-item">🔑 <strong>Passcode:</strong> ${data.passcode}</div>` : ''}
+      </div>
+
+      <div class="note">
+        <p><strong>📝 What to Prepare:</strong></p>
+        <ul style="margin:10px 0;padding-left:20px;">
+          <li>Stable internet connection</li>
+          <li>Questions about PlataPay business opportunities</li>
+          <li>Pen and paper for notes</li>
+        </ul>
+      </div>
+
+      <div style="text-align:center;margin:30px 0;">
+        <a href="${data.calendarLink || 'https://platapay.ph/agents'}" class="button">Add to Calendar</a>
+      </div>
+
+      <p>Can't make it? Reply to this email to reschedule, or call us at <strong>+639176851216</strong>.</p>`
+  }),
+
+  // 12. TIER 2: Post-Webinar Follow-up
+  webinar_followup: (data) => emailBaseTemplate({
+    title: 'Thanks for Attending! 🎉',
+    preheader: `Here's your recap from the ${data.webinarTitle || 'PlataPay Business Orientation'}`,
+    bodyContent: `
+      <p>Hi ${data.name || 'there'}!</p>
+      <p>Thank you for attending our <strong>${data.webinarTitle || 'PlataPay Business Orientation'}</strong>! We hope you found it valuable.</p>
+      
+      <div class="highlight-box">
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📋 Quick Recap</h3>
+        <div class="service-item">✅ PlataPay offers 13+ revenue-generating services</div>
+        <div class="service-item">✅ 80,000+ agents nationwide</div>
+        <div class="service-item">✅ Business Lite package: ₱449,000 (3-year contract)</div>
+        <div class="service-item">✅ All-in-One package: ₱799,000 (lifetime contract)</div>
+        <div class="service-item">✅ ROI as fast as 3 months</div>
+      </div>
+
+      ${data.recordingLink ? `
+      <div class="highlight-box">
+        <h3 style="margin:0 0 10px;color:${PLATAPAY_BRAND_COLOR};">🎬 Missed Something?</h3>
+        <p>Watch the recording anytime:</p>
+        <a href="${data.recordingLink}" style="color:${PLATAPAY_BRAND_COLOR};font-weight:bold;">${data.recordingLink}</a>
+      </div>
+      ` : ''}
+
+      <div style="text-align:center;margin:30px 0;">
+        <a href="https://platapay.ph/franchise" class="button">View Franchise Packages</a>
+      </div>
+
+      <div class="note">
+        <p><strong>Ready to start?</strong> Call/Viber us at <strong>+639176851216</strong> or reply to this email to begin your application!</p>
+      </div>`
+  }),
+
+  // 13. TIER 2: 7-Day Drip - Day 1 (Earnings Potential)
+  drip_day1_earnings: (data) => emailBaseTemplate({
+    title: '💰 How Much Can You Really Earn?',
+    preheader: 'Real earnings breakdown for PlataPay agents',
+    bodyContent: `
+      <p>Hi ${data.name || 'there'}!</p>
+      <p>Yesterday you showed interest in PlataPay — today let's talk <strong>real numbers</strong>.</p>
+      
+      <div class="highlight-box">
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">💵 Commission Breakdown</h3>
+        <div class="service-item">📱 <strong>E-Loading:</strong> ₱1-3 per transaction</div>
+        <div class="service-item">💡 <strong>Bills Payment:</strong> ₱5-15 per transaction</div>
+        <div class="service-item">💸 <strong>Remittance:</strong> ₱10-25 per transaction</div>
+        <div class="service-item">📦 <strong>J&T Parcels:</strong> 20% (₱50 on ₱250 parcel)</div>
+        <div class="service-item">✈️ <strong>Travel Bookings:</strong> ₱100-500 per booking</div>
+      </div>
+
+      <p><strong>Example:</strong> With just 50 transactions/day at average ₱8 commission = <strong>₱400/day or ₱10,400/month</strong> — and that's conservative!</p>
+
+      <div class="note">
+        <p>Top agents earn <strong>₱30,000-50,000+ monthly</strong> in high-traffic locations.</p>
+      </div>
+
+      <div style="text-align:center;margin:30px 0;">
+        <a href="https://m.me/PlataPay?ref=EARNINGS" class="button">Ask About Earnings</a>
+      </div>`
+  }),
+
+  // 14. TIER 2: 7-Day Drip - Day 3 (Success Stories)
+  drip_day3_success: (data) => emailBaseTemplate({
+    title: '🌟 Real Agents, Real Success',
+    preheader: 'See how PlataPay agents are thriving',
+    bodyContent: `
+      <p>Hi ${data.name || 'there'}!</p>
+      <p>Don't just take our word for it — here's what our <strong>80,000+ agents</strong> are saying:</p>
+      
+      <div class="highlight-box" style="border-left:4px solid ${PLATAPAY_BRAND_COLOR};">
+        <p><em>"PlataPay transformed my sari-sari store into a one-stop payment center. My customers love the convenience!"</em></p>
+        <p style="font-size:14px;color:#666;">— Maria S., Batangas</p>
+      </div>
+
+      <div class="highlight-box" style="border-left:4px solid ${PLATAPAY_BRAND_COLOR};">
+        <p><em>"I started with just ₱5,000 capital. Now I'm earning ₱25,000+ monthly from commissions alone."</em></p>
+        <p style="font-size:14px;color:#666;">— Juan D., Laguna</p>
+      </div>
+
+      <div class="highlight-box" style="border-left:4px solid ${PLATAPAY_BRAND_COLOR};">
+        <p><em>"The training was comprehensive. Even without tech experience, I was processing transactions in my first week!"</em></p>
+        <p style="font-size:14px;color:#666;">— Elena B., Cavite</p>
+      </div>
+
+      <p><strong>New branches opening weekly:</strong> Santa Rosa, Pasay, Davao, Cebu, and more!</p>
+
+      <div style="text-align:center;margin:30px 0;">
+        <a href="https://platapay.ph/testimonials" class="button">Read More Stories</a>
+      </div>`
+  }),
+
+  // 15. TIER 2: 7-Day Drip - Day 5 (Franchise Details)
+  drip_day5_franchise: (data) => emailBaseTemplate({
+    title: '📦 Which Package Is Right For You?',
+    preheader: 'Compare PlataPay franchise packages',
+    bodyContent: `
+      <p>Hi ${data.name || 'there'}!</p>
+      <p>Ready to make it official? Here's a side-by-side comparison of our packages:</p>
+      
+      <div class="highlight-box">
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📦 Business Lite — ₱449,000</h3>
+        <div class="service-item">📄 3-Year Contract</div>
+        <div class="service-item">💻 Computer Set + Thermal Printer</div>
+        <div class="service-item">🏧 Encash ATM Device</div>
+        <div class="service-item">👕 2 Sets of Uniforms</div>
+        <div class="service-item">🎉 Grand Branch Opening</div>
+        <div class="service-item">💰 ₱3,000 Initial Fund</div>
+        <div class="service-item">📍 500m Area Protection</div>
+        <p style="margin-top:10px;font-size:14px;"><strong>Best for:</strong> First-time entrepreneurs</p>
+      </div>
+
+      <div class="highlight-box">
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">🏆 All-in-One — ₱799,000</h3>
+        <div class="service-item">♾️ <strong>LIFETIME</strong> Contract (no expiration!)</div>
+        <div class="service-item">✅ Everything in Business Lite</div>
+        <div class="service-item">⭐ Premium support & features</div>
+        <p style="margin-top:10px;font-size:14px;"><strong>Best for:</strong> Serious business owners</p>
+      </div>
+
+      <div class="note">
+        <p><strong>ROI Timeline:</strong> 3-22 months depending on location and volume</p>
+      </div>
+
+      <div style="text-align:center;margin:30px 0;">
+        <a href="tel:+639176851216" class="button">📞 Schedule Orientation</a>
+      </div>`
+  }),
+
+  // 16. TIER 2: 7-Day Drip - Day 7 (Final CTA)
+  drip_day7_final: (data) => emailBaseTemplate({
+    title: '⏰ Your PlataPay Journey Awaits',
+    preheader: 'Limited slots available — start your application today',
+    bodyContent: `
+      <p>Hi ${data.name || 'there'}!</p>
+      <p>It's been a week since you first showed interest in PlataPay. Here's a quick recap of what you'll get:</p>
+      
+      <div class="highlight-box">
+        <div class="service-item">✅ 13+ services in one platform</div>
+        <div class="service-item">✅ Join 80,000+ successful agents</div>
+        <div class="service-item">✅ Earn ₱10,000-50,000+ monthly</div>
+        <div class="service-item">✅ Full training and ongoing support</div>
+        <div class="service-item">✅ BSP-compliant, secure platform</div>
+      </div>
+
+      <p><strong>🔥 This week only:</strong> Schedule your FREE business orientation and get a complimentary starter kit consultation!</p>
+
+      <div style="text-align:center;margin:30px 0;">
+        <a href="tel:+639176851216" class="button" style="font-size:18px;padding:16px 32px;">📞 Call Now: +639176851216</a>
+      </div>
+
+      <div style="text-align:center;margin:20px 0;">
+        <a href="https://m.me/PlataPay?ref=APPLY" class="button button-purple">💬 Message Us on Messenger</a>
+      </div>
+
+      <div class="note">
+        <p><strong>Questions?</strong> Reply to this email or call <strong>+639176851216</strong> / landline <strong>043-772-0017</strong></p>
+      </div>
+
+      <p style="text-align:center;font-size:14px;color:#666;">Not ready yet? No problem — we'll be here when you are. 😊</p>`
   })
 };
 
@@ -1160,6 +1356,10 @@ async function handleMessagingEvent(entry) {
           await conversation.save(null, { useMasterKey: true });
         }
       } else if (event.referral) {
+        // TIER 2 #7: Referral Source Tracking
+        const referralSource = event.referral.ref || '';
+        const referralType = event.referral.source || 'SHORTLINK'; // SHORTLINK, ADS, MESSENGER_CODE
+        
         const msg = new Parse.Object('Message');
         msg.set('business', business);
         msg.set('conversation', conversation);
@@ -1167,10 +1367,42 @@ async function handleMessagingEvent(entry) {
         msg.set('channel', 'messenger');
         msg.set('senderPsid', senderPsid);
         msg.set('messageType', 'referral');
-        msg.set('content', event.referral.ref || '');
+        msg.set('content', referralSource);
         msg.set('rawPayload', event.referral);
         msg.set('timestamp', event.timestamp ? new Date(event.timestamp) : new Date());
         await msg.save(null, { useMasterKey: true });
+
+        // Tag contact with referral source for tracking
+        if (referralSource) {
+          contact.set('referralSource', referralSource);
+          contact.set('referralType', referralType);
+          contact.set('referralTimestamp', new Date());
+          await contact.save(null, { useMasterKey: true });
+          console.log(`[Referral] Tagged contact ${senderPsid} with source: ${referralSource} (${referralType})`);
+
+          // Send source-specific welcome based on referral
+          try {
+            const token = await getPageAccessToken(business);
+            const firstName = contact.get('firstName') || '';
+            
+            // Customize welcome based on referral source
+            const sourceWelcomes = {
+              'AGENT': `Hi${firstName ? ' ' + firstName : ''}! 👋 Thanks for your interest in becoming a PlataPay Agent!\n\nWould you like to:\n• Learn about earnings potential\n• See franchise packages\n• Schedule a webinar`,
+              'EARNINGS': `Hi${firstName ? ' ' + firstName : ''}! 💰 Interested in earning with PlataPay?\n\nOur agents earn ₱10,000-50,000+ monthly!\n\nWant to know more?`,
+              'FRANCHISE': `Hi${firstName ? ' ' + firstName : ''}! 📦 Looking at PlataPay franchise packages?\n\nWe have:\n• Business Lite: ₱449,000 (3yr)\n• All-in-One: ₱799,000 (lifetime)\n\nWhich interests you?`,
+              'APPLY': `Hi${firstName ? ' ' + firstName : ''}! 📝 Ready to apply?\n\nCall us at +639176851216 or reply here to start your application!`,
+              'WEBINAR': `Hi${firstName ? ' ' + firstName : ''}! 📅 Want to join our next webinar?\n\nWe have sessions Mon-Sat at:\n• 10 AM\n• 2 PM\n• 5 PM\n• 8 PM\n\nWhich time works for you?`,
+            };
+
+            const welcomeMsg = sourceWelcomes[referralSource.toUpperCase()] || 
+              `Hi${firstName ? ' ' + firstName : ''}! 👋 Welcome to PlataPay!\n\nHow can we help you today?`;
+            
+            await callSendApi(token, senderPsid, { text: welcomeMsg });
+            console.log(`[Referral] Sent source-specific welcome for: ${referralSource}`);
+          } catch (refErr) {
+            console.error('[Referral] Welcome message error:', refErr.message);
+          }
+        }
       }
     } catch (err) {
       console.error('[handleMessagingEvent] Error:', err.message, err.stack);
@@ -1329,6 +1561,129 @@ async function sendPipelineStageEmail(lead, business, newStage) {
 }
 
 // =============================================================================
+// TIER 2 #6: Lead Scoring System
+// =============================================================================
+
+function calculateLeadScore(fieldData, interactions = 0) {
+  let score = 0;
+  const reasons = [];
+
+  // Form completeness (+10)
+  const filledFields = Object.values(fieldData).filter(v => v && v.toString().trim()).length;
+  if (filledFields >= 3) {
+    score += 10;
+    reasons.push('Form completeness (+10)');
+  }
+
+  // Agent keywords (+20)
+  const agentKeywords = ['agent', 'partner', 'negosyo', 'franchise', 'business', 'kita', 'earn', 'income'];
+  const allText = Object.values(fieldData).join(' ').toLowerCase();
+  if (agentKeywords.some(kw => allText.includes(kw))) {
+    score += 20;
+    reasons.push('Agent intent keywords (+20)');
+  }
+
+  // Email provided (+15)
+  if (fieldData.email || fieldData.work_email) {
+    score += 15;
+    reasons.push('Email provided (+15)');
+  }
+
+  // Phone provided (+10)
+  if (fieldData.phone || fieldData.phone_number) {
+    score += 10;
+    reasons.push('Phone provided (+10)');
+  }
+
+  // Full name provided (+5)
+  if (fieldData.full_name || (fieldData.first_name && fieldData.last_name)) {
+    score += 5;
+    reasons.push('Full name provided (+5)');
+  }
+
+  // Location provided (+5)
+  if (fieldData.city || fieldData.province || fieldData.location || fieldData.address) {
+    score += 5;
+    reasons.push('Location provided (+5)');
+  }
+
+  // Multiple interactions (+5 each, max +25)
+  const interactionBonus = Math.min(interactions * 5, 25);
+  if (interactionBonus > 0) {
+    score += interactionBonus;
+    reasons.push(`Multiple interactions (+${interactionBonus})`);
+  }
+
+  return {
+    score,
+    isHot: score >= 50,
+    reasons,
+    tier: score >= 50 ? 'hot' : score >= 30 ? 'warm' : 'cold'
+  };
+}
+
+// =============================================================================
+// TIER 2 #9: 7-Day Welcome Drip Series Enrollment
+// =============================================================================
+
+async function enrollIn7DayDrip(contact, business, isAgentLead) {
+  try {
+    const email = contact.get('email');
+    if (!email || contact.get('emailUnsubscribed')) return;
+
+    const firstName = contact.get('firstName') || '';
+    const drip = isAgentLead ? [
+      { day: 0, template: 'welcome_agent', subject: 'Welcome to PlataPay! 🎉' },
+      { day: 1, template: 'drip_day1_earnings', subject: '💰 How Much Can You Really Earn?' },
+      { day: 3, template: 'drip_day3_success', subject: '🌟 Real Agents, Real Success' },
+      { day: 5, template: 'drip_day5_franchise', subject: '📦 Which Package Is Right For You?' },
+      { day: 7, template: 'drip_day7_final', subject: '⏰ Your PlataPay Journey Awaits' },
+    ] : [
+      { day: 0, template: 'welcome_customer', subject: 'Welcome to PlataPay!' },
+      { day: 3, template: 'custom', subject: 'Find a PlataPay Agent Near You', data: { name: firstName, content: `
+        <p>Looking for convenient payment services in your area?</p>
+        <div class="highlight-box">
+          <div class="service-item">💡 Bills Payment</div>
+          <div class="service-item">📱 E-Loading</div>
+          <div class="service-item">💸 Remittance</div>
+          <div class="service-item">🏛️ Government Payments</div>
+        </div>
+        <div style="text-align:center;margin:30px 0;">
+          <a href="https://platapay.ph/agents" class="button">Find Nearest Agent</a>
+        </div>
+      ` }},
+    ];
+
+    // Schedule drip emails
+    for (const step of drip) {
+      const sendAt = new Date(Date.now() + step.day * 24 * 60 * 60 * 1000);
+      
+      // Skip day 0 - it's sent immediately in processNewLead
+      if (step.day === 0) continue;
+
+      const scheduledAction = new Parse.Object('ScheduledAction');
+      scheduledAction.set('actionType', 'email');
+      scheduledAction.set('status', 'pending');
+      scheduledAction.set('scheduledFor', sendAt);
+      scheduledAction.set('payload', {
+        to: email,
+        template: step.template,
+        data: step.data || { name: firstName },
+        subject: step.subject
+      });
+      scheduledAction.set('contactId', contact.id);
+      scheduledAction.set('dripType', isAgentLead ? 'agent_7day' : 'customer_7day');
+      scheduledAction.set('dripDay', step.day);
+      await scheduledAction.save(null, { useMasterKey: true });
+    }
+
+    console.log(`[Drip] Enrolled ${email} in ${isAgentLead ? 'agent' : 'customer'} 7-day drip`);
+  } catch (err) {
+    console.error('[Drip] Enrollment error:', err.message);
+  }
+}
+
+// =============================================================================
 // New Lead Processing (replaces Back4App afterSave FbLead)
 // =============================================================================
 
@@ -1338,6 +1693,15 @@ async function processNewLead(fbLead, business) {
     const formId = fbLead.get('formId') || '';
     const email = fieldData.email || fieldData.work_email || '';
     const phone = fieldData.phone_number || fieldData.phone || '';
+
+    // TIER 2 #6: Calculate lead score
+    const scoreResult = calculateLeadScore(fieldData, 1);
+    fbLead.set('leadScore', scoreResult.score);
+    fbLead.set('leadScoreTier', scoreResult.tier);
+    fbLead.set('leadScoreReasons', scoreResult.reasons);
+    if (scoreResult.isHot) {
+      console.log(`[Lead] 🔥 HOT LEAD detected! Score: ${scoreResult.score}, Reasons: ${scoreResult.reasons.join(', ')}`);
+    }
 
     // Find or create contact
     let contact = null;
@@ -1422,11 +1786,16 @@ async function processNewLead(fbLead, business) {
         if (!contactIsUnsubscribed) {
           if (isAgentLead) {
             await sendEmail({ to: email, template: 'welcome_agent', data: { name: fieldData.first_name || fieldData.full_name || '', businessId: business.id }, subject: 'Welcome to PlataPay — Your Agent Journey Starts Now!' });
-            await sendEmail({ to: email, template: 'franchise_inquiry', data: { name: fieldData.first_name || fieldData.full_name || '', businessId: business.id }, subject: 'PlataPay Franchise Packages — Start Your Business Today' });
-            console.log('[processNewLead] Sent welcome_agent + franchise_inquiry emails to', email);
+            console.log('[processNewLead] Sent welcome_agent email to', email);
+            
+            // TIER 2 #9: Enroll in 7-day agent drip series
+            await enrollIn7DayDrip(contact, business, true);
           } else {
             await sendEmail({ to: email, template: 'welcome_customer', data: { name: fieldData.first_name || fieldData.full_name || '', businessId: business.id }, subject: 'Welcome to PlataPay!' });
             console.log('[processNewLead] Sent welcome_customer email to', email);
+            
+            // TIER 2 #9: Enroll in 7-day customer drip series
+            await enrollIn7DayDrip(contact, business, false);
           }
         }
       } catch (emailErr) {
@@ -1437,6 +1806,11 @@ async function processNewLead(fbLead, business) {
     // Send pipeline stage email for agent leads
     if (isAgentLead && email) {
       await sendPipelineStageEmail(fbLead, business, 'inquiry');
+    }
+    
+    // Log hot leads for priority follow-up
+    if (scoreResult.isHot) {
+      console.log(`[processNewLead] 🔥 HOT LEAD: ${email || phone} - Score: ${scoreResult.score}`);
     }
 
     // Auto-enroll in NurtureSequence
@@ -1726,6 +2100,180 @@ app.post('/api/enroll-in-nurture', async (req, res) => {
 });
 
 // =============================================================================
+// TIER 2: Lead Scoring & Referral Analytics API Endpoints
+// =============================================================================
+
+// Get leads by score tier (hot/warm/cold)
+app.get('/api/leads/by-score', async (req, res) => {
+  try {
+    const { tier, minScore, limit = 50 } = req.query;
+    
+    const query = new Parse.Query('FbLead');
+    query.descending('leadScore');
+    query.limit(parseInt(limit));
+    
+    if (tier) {
+      query.equalTo('leadScoreTier', tier);
+    }
+    if (minScore) {
+      query.greaterThanOrEqualTo('leadScore', parseInt(minScore));
+    }
+    
+    const leads = await query.find({ useMasterKey: true });
+    
+    const results = leads.map(l => ({
+      id: l.id,
+      email: l.get('email'),
+      phone: l.get('phone'),
+      fullName: l.get('fullName') || `${l.get('firstName') || ''} ${l.get('lastName') || ''}`.trim(),
+      leadScore: l.get('leadScore'),
+      leadScoreTier: l.get('leadScoreTier'),
+      leadScoreReasons: l.get('leadScoreReasons'),
+      pipelineStage: l.get('pipelineStage'),
+      createdAt: l.get('createdAt')
+    }));
+
+    // Count by tier
+    const hotQuery = new Parse.Query('FbLead');
+    hotQuery.equalTo('leadScoreTier', 'hot');
+    const hotCount = await hotQuery.count({ useMasterKey: true });
+    
+    const warmQuery = new Parse.Query('FbLead');
+    warmQuery.equalTo('leadScoreTier', 'warm');
+    const warmCount = await warmQuery.count({ useMasterKey: true });
+    
+    const coldQuery = new Parse.Query('FbLead');
+    coldQuery.equalTo('leadScoreTier', 'cold');
+    const coldCount = await coldQuery.count({ useMasterKey: true });
+
+    res.json({ 
+      leads: results, 
+      count: results.length,
+      summary: { hot: hotCount, warm: warmCount, cold: coldCount }
+    });
+  } catch (err) {
+    console.error('[API] leads/by-score error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Recalculate lead score for a specific lead
+app.post('/api/leads/:id/recalculate-score', async (req, res) => {
+  try {
+    const lead = await new Parse.Query('FbLead').get(req.params.id, { useMasterKey: true });
+    const fieldData = lead.get('fieldData') || {};
+    
+    // Count interactions
+    const contact = lead.get('contact');
+    let interactions = 1;
+    if (contact) {
+      const msgQuery = new Parse.Query('Message');
+      msgQuery.equalTo('senderPsid', contact.get ? contact.get('psid') : '');
+      interactions = await msgQuery.count({ useMasterKey: true });
+    }
+    
+    const scoreResult = calculateLeadScore(fieldData, interactions);
+    
+    lead.set('leadScore', scoreResult.score);
+    lead.set('leadScoreTier', scoreResult.tier);
+    lead.set('leadScoreReasons', scoreResult.reasons);
+    await lead.save(null, { useMasterKey: true });
+
+    res.json({ 
+      success: true, 
+      leadId: lead.id,
+      score: scoreResult.score,
+      tier: scoreResult.tier,
+      isHot: scoreResult.isHot,
+      reasons: scoreResult.reasons
+    });
+  } catch (err) {
+    console.error('[API] recalculate-score error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get referral source analytics
+app.get('/api/analytics/referrals', async (req, res) => {
+  try {
+    const query = new Parse.Query('MessengerContact');
+    query.exists('referralSource');
+    query.limit(1000);
+    const contacts = await query.find({ useMasterKey: true });
+
+    // Group by source
+    const sourceStats = {};
+    contacts.forEach(c => {
+      const source = c.get('referralSource') || 'unknown';
+      if (!sourceStats[source]) {
+        sourceStats[source] = { count: 0, contacts: [] };
+      }
+      sourceStats[source].count++;
+      sourceStats[source].contacts.push({
+        id: c.id,
+        firstName: c.get('firstName'),
+        referralTimestamp: c.get('referralTimestamp')
+      });
+    });
+
+    // Convert to array and sort by count
+    const sources = Object.entries(sourceStats)
+      .map(([source, data]) => ({ source, ...data }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json({ 
+      totalReferrals: contacts.length,
+      sources,
+      topSource: sources[0] || null
+    });
+  } catch (err) {
+    console.error('[API] analytics/referrals error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Schedule webinar registration email
+app.post('/api/webinar/register', async (req, res) => {
+  try {
+    const { email, name, webinarDate, webinarTime, meetingLink, meetingId, passcode, platform } = req.body;
+    if (!email || !webinarDate || !webinarTime) {
+      return res.status(400).json({ error: 'email, webinarDate, and webinarTime are required' });
+    }
+
+    // Send registration confirmation
+    await sendEmail({
+      to: email,
+      template: 'webinar_registration',
+      data: { name, webinarDate, webinarTime, meetingLink, meetingId, passcode, platform: platform || 'Zoom' },
+      subject: '✅ Webinar Registration Confirmed!'
+    });
+
+    // Schedule follow-up email 1 hour after webinar (assume webinar is 1 hour)
+    const webinarDateTime = new Date(`${webinarDate} ${webinarTime}`);
+    const followUpTime = new Date(webinarDateTime.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
+
+    if (followUpTime > new Date()) {
+      const scheduledAction = new Parse.Object('ScheduledAction');
+      scheduledAction.set('actionType', 'email');
+      scheduledAction.set('status', 'pending');
+      scheduledAction.set('scheduledFor', followUpTime);
+      scheduledAction.set('payload', {
+        to: email,
+        template: 'webinar_followup',
+        data: { name, webinarTitle: 'PlataPay Business Orientation' },
+        subject: 'Thanks for Attending! 🎉'
+      });
+      await scheduledAction.save(null, { useMasterKey: true });
+    }
+
+    res.json({ success: true, email, webinarDate, webinarTime, followUpScheduled: followUpTime > new Date() });
+  } catch (err) {
+    console.error('[API] webinar/register error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =============================================================================
 // Email API Endpoints
 // =============================================================================
 
@@ -1775,6 +2323,13 @@ app.get('/api/email-templates', (req, res) => {
     branch_opening: { name: 'Branch Opening', description: 'Announcement for new PlataPay branch location' },
     newsletter: { name: 'Newsletter', description: 'Monthly newsletter or campaign blast' },
     custom: { name: 'Custom', description: 'Custom/generic email with flexible content' },
+    // TIER 2: New templates
+    webinar_registration: { name: 'Webinar Registration', description: 'Webinar confirmation with date, time, meeting link' },
+    webinar_followup: { name: 'Webinar Follow-up', description: 'Post-webinar recap, recording link, CTA' },
+    drip_day1_earnings: { name: '7-Day Drip: Day 1', description: 'Earnings potential breakdown' },
+    drip_day3_success: { name: '7-Day Drip: Day 3', description: 'Agent success stories' },
+    drip_day5_franchise: { name: '7-Day Drip: Day 5', description: 'Franchise package comparison' },
+    drip_day7_final: { name: '7-Day Drip: Day 7', description: 'Final CTA with urgency' },
   };
   res.json({ templates, count: Object.keys(templates).length });
 });
