@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/mcp-config.json",
+  "mcpServers": {
+    "innovatehub": {
+      "command": "node",
+      "args": ["/root/innovatehub-hub/mcp-server/index.js"],
+      "env": {}
+    },
+    "meta-ads": {
+      "url": "https://mcp.pipeboard.co/meta-ads-mcp"
+    }
+  }
+}

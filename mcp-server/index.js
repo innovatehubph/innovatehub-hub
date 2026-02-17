@@ -434,6 +434,477 @@ server.resource(
   }
 );
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TIER 4: Marketing Automation Tools
+// ═══════════════════════════════════════════════════════════════════════════
+
+const WEBHOOK_SERVER_URL = 'http://localhost:3790';
+
+// 13. get_leads_summary
+server.tool(
+  'get_leads_summary',
+  'Get lead analytics: counts by score tier, pipeline stage, recent leads',
+  {
+    days: z.number().optional().describe('Number of days to look back (default 7)'),
+  },
+  async ({ days = 7 }) => {
+    try {
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      
+      // Get lead counts by score tier
+      const scoreRes = await fetch(`${WEBHOOK_SERVER_URL}/api/leads/by-score?limit=1000`);
+      const scoreData = await scoreRes.json();
+      
+      // Get pipeline stages
+      const pipelineData = await parseRequest('GET', '/classes/FbLead?limit=1000', null, true);
+      const leads = pipelineData.results || [];
+      
+      const stageCount = {};
+      const recentLeads = [];
+      
+      leads.forEach(l => {
+        const stage = l.pipelineStage || 'unassigned';
+        stageCount[stage] = (stageCount[stage] || 0) + 1;
+        
+        if (new Date(l.createdAt) > new Date(since)) {
+          recentLeads.push({
+            id: l.objectId,
+            name: l.fullName || `${l.firstName || ''} ${l.lastName || ''}`.trim(),
+            email: l.email,
+            score: l.leadScore,
+            tier: l.leadScoreTier,
+            stage: l.pipelineStage,
+            createdAt: l.createdAt
+          });
+        }
+      });
+
+      const result = {
+        totalLeads: leads.length,
+        byScoreTier: scoreData.summary || {},
+        byPipelineStage: stageCount,
+        recentLeads: recentLeads.slice(0, 20),
+        period: `${days} days`
+      };
+      
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 14. get_email_analytics
+server.tool(
+  'get_email_analytics',
+  'Get email sending statistics: sent, failed, templates used',
+  {
+    days: z.number().optional().describe('Number of days to look back (default 7)'),
+  },
+  async ({ days = 7 }) => {
+    try {
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      
+      const emailLogs = await parseRequest('GET', `/classes/EmailLog?where=${encodeURIComponent(JSON.stringify({
+        sentAt: { $gte: { __type: 'Date', iso: since } }
+      }))}&limit=1000`, null, true);
+      
+      const logs = emailLogs.results || [];
+      const byTemplate = {};
+      const byStatus = { sent: 0, failed: 0 };
+      const byDay = {};
+      
+      logs.forEach(l => {
+        // By template
+        const t = l.template || 'unknown';
+        byTemplate[t] = (byTemplate[t] || 0) + 1;
+        
+        // By status
+        byStatus[l.status] = (byStatus[l.status] || 0) + 1;
+        
+        // By day
+        const day = l.sentAt?.iso?.substring(0, 10) || 'unknown';
+        byDay[day] = (byDay[day] || 0) + 1;
+      });
+
+      const result = {
+        totalEmails: logs.length,
+        byStatus,
+        byTemplate,
+        byDay,
+        period: `${days} days`
+      };
+      
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 15. send_marketing_email
+server.tool(
+  'send_marketing_email',
+  'Send a marketing email using the webhook server',
+  {
+    to: z.string().describe('Recipient email address'),
+    template: z.string().describe('Email template name (welcome_agent, franchise_inquiry, etc.)'),
+    subject: z.string().optional().describe('Custom subject line'),
+    data: z.record(z.any()).optional().describe('Template data (name, content, etc.)'),
+  },
+  async ({ to, template, subject, data }) => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, template, subject, data: data || {} })
+      });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 16. update_lead_pipeline
+server.tool(
+  'update_lead_pipeline',
+  'Move a lead to a new pipeline stage (triggers stage emails)',
+  {
+    leadId: z.string().describe('Lead objectId'),
+    newStage: z.enum(['inquiry', 'application', 'screening', 'training', 'onboarded', 'rejected']).describe('New pipeline stage'),
+    notes: z.string().optional().describe('Optional notes about the stage change'),
+  },
+  async ({ leadId, newStage, notes }) => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/update-pipeline-stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId, newStage, notes })
+      });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 17. get_bot_flows
+server.tool(
+  'get_bot_flows',
+  'List all bot flows with trigger keywords and step counts',
+  {},
+  async () => {
+    try {
+      const flows = await parseRequest('GET', '/classes/BotFlow?limit=100', null, true);
+      const result = (flows.results || []).map(f => ({
+        id: f.objectId,
+        name: f.name,
+        isActive: f.isActive,
+        triggerKeywords: f.triggerKeywords || [],
+        stepCount: (f.steps || []).length,
+        createdAt: f.createdAt
+      }));
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 18. get_ab_test_results
+server.tool(
+  'get_ab_test_results',
+  'Get A/B test results for bot flows with conversion rates',
+  {},
+  async () => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/ab-tests`);
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 19. get_sla_report
+server.tool(
+  'get_sla_report',
+  'Get conversation SLA compliance report',
+  {},
+  async () => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/sla-report`);
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 20. get_referral_analytics
+server.tool(
+  'get_referral_analytics',
+  'Get referral source tracking and conversion data',
+  {},
+  async () => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/analytics/referrals`);
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 21. trigger_daily_digest
+server.tool(
+  'trigger_daily_digest',
+  'Manually trigger the admin daily digest email',
+  {},
+  async () => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/send-daily-digest`, { method: 'POST' });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 22. trigger_reengagement
+server.tool(
+  'trigger_reengagement',
+  'Manually trigger re-engagement sequence for dormant contacts',
+  {},
+  async () => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/trigger-reengagement`, { method: 'POST' });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 23. check_conversation_sla
+server.tool(
+  'check_conversation_sla',
+  'Manually run SLA compliance check (sends alerts for pending conversations)',
+  {},
+  async () => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/check-sla`, { method: 'POST' });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 24. schedule_email
+server.tool(
+  'schedule_email',
+  'Schedule an email to be sent at a future time',
+  {
+    to: z.string().describe('Recipient email address'),
+    template: z.string().describe('Email template name'),
+    sendAt: z.string().describe('ISO datetime when to send the email'),
+    subject: z.string().optional().describe('Custom subject line'),
+    data: z.record(z.any()).optional().describe('Template data'),
+  },
+  async ({ to, template, sendAt, subject, data }) => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/schedule-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, template, sendAt, subject, data: data || {} })
+      });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 25. get_scheduled_emails
+server.tool(
+  'get_scheduled_emails',
+  'List all pending scheduled emails',
+  {},
+  async () => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/scheduled-emails`);
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 26. find_duplicate_contacts
+server.tool(
+  'find_duplicate_contacts',
+  'Find duplicate contacts for a business by phone/email',
+  {
+    businessId: z.string().describe('Business objectId'),
+  },
+  async ({ businessId }) => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/duplicates/${businessId}`);
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 27. merge_contacts
+server.tool(
+  'merge_contacts',
+  'Merge two duplicate contacts into one',
+  {
+    primaryContactId: z.string().describe('Contact to keep'),
+    secondaryContactId: z.string().describe('Contact to merge into primary'),
+  },
+  async ({ primaryContactId, secondaryContactId }) => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/merge-contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ primaryContactId, secondaryContactId })
+      });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 28. enroll_nurture_sequence
+server.tool(
+  'enroll_nurture_sequence',
+  'Enroll a lead in a nurture sequence',
+  {
+    businessId: z.string().describe('Business objectId'),
+    leadId: z.string().describe('Lead objectId'),
+    sequenceId: z.string().describe('NurtureSequence objectId'),
+  },
+  async ({ businessId, leadId, sequenceId }) => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/enroll-in-nurture`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessId, leadId, sequenceId })
+      });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// 29. register_webinar
+server.tool(
+  'register_webinar',
+  'Register someone for a webinar and send confirmation email',
+  {
+    email: z.string().describe('Attendee email'),
+    name: z.string().optional().describe('Attendee name'),
+    webinarDate: z.string().describe('Date of webinar (e.g., "February 20, 2026")'),
+    webinarTime: z.string().describe('Time of webinar (e.g., "2:00 PM")'),
+    meetingLink: z.string().optional().describe('Zoom/Meet link'),
+    meetingId: z.string().optional().describe('Meeting ID'),
+    passcode: z.string().optional().describe('Meeting passcode'),
+  },
+  async ({ email, name, webinarDate, webinarTime, meetingLink, meetingId, passcode }) => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/webinar/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name, webinarDate, webinarTime, meetingLink, meetingId, passcode })
+      });
+      const result = await res.json();
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Resources: Marketing Analytics
+// ═══════════════════════════════════════════════════════════════════════════
+
+// 4. Marketing Dashboard
+server.resource(
+  'marketing-dashboard',
+  'innovatehub://marketing-dashboard',
+  { description: 'Live marketing metrics: leads, emails, SLA, referrals' },
+  async () => {
+    let dashboard = {};
+    try {
+      // Leads
+      const leadsRes = await fetch(`${WEBHOOK_SERVER_URL}/api/leads/by-score?limit=1`);
+      const leadsData = await leadsRes.json();
+      dashboard.leads = leadsData.summary || {};
+      
+      // SLA
+      const slaRes = await fetch(`${WEBHOOK_SERVER_URL}/api/sla-report`);
+      dashboard.sla = await slaRes.json();
+      
+      // Referrals
+      const refRes = await fetch(`${WEBHOOK_SERVER_URL}/api/analytics/referrals`);
+      const refData = await refRes.json();
+      dashboard.referrals = { total: refData.totalReferrals, topSource: refData.topSource?.source };
+      
+      // A/B Tests
+      const abRes = await fetch(`${WEBHOOK_SERVER_URL}/api/ab-tests`);
+      const abData = await abRes.json();
+      dashboard.abTests = { count: abData.count };
+      
+      // Scheduled emails
+      const schedRes = await fetch(`${WEBHOOK_SERVER_URL}/api/scheduled-emails`);
+      const schedData = await schedRes.json();
+      dashboard.scheduledEmails = { pending: schedData.count };
+      
+    } catch (err) {
+      dashboard.error = err.message;
+    }
+    
+    return { contents: [{ uri: 'innovatehub://marketing-dashboard', text: JSON.stringify(dashboard, null, 2), mimeType: 'application/json' }] };
+  }
+);
+
+// 5. Email Templates
+server.resource(
+  'email-templates',
+  'innovatehub://email-templates',
+  { description: 'Available email templates for marketing automation' },
+  async () => {
+    try {
+      const res = await fetch(`${WEBHOOK_SERVER_URL}/api/email-templates`);
+      const data = await res.json();
+      return { contents: [{ uri: 'innovatehub://email-templates', text: JSON.stringify(data, null, 2), mimeType: 'application/json' }] };
+    } catch (err) {
+      return { contents: [{ uri: 'innovatehub://email-templates', text: JSON.stringify({ error: err.message }), mimeType: 'application/json' }] };
+    }
+  }
+);
+
 // ─── Start ───
 
 const transport = new StdioServerTransport();
