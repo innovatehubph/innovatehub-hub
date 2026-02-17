@@ -990,6 +990,29 @@ async function getOrCreateContact(business, psid, channel) {
   query.equalTo('psid', psid);
   query.equalTo('channel', contactChannel);
   let contact = await query.first({ useMasterKey: true });
+  
+  // If contact exists but has no name, try to fetch profile again
+  if (contact && !contact.get('firstName')) {
+    try {
+      const token = await getPageAccessToken(business);
+      const res = await fetch(`${GRAPH_API_BASE}/${psid}?fields=first_name,last_name,profile_pic,locale&access_token=${token}`);
+      if (res.ok) {
+        const profile = await res.json();
+        if (profile.first_name) {
+          contact.set('firstName', profile.first_name);
+          contact.set('lastName', profile.last_name || '');
+          contact.set('profilePic', profile.profile_pic || '');
+          contact.set('locale', profile.locale || '');
+          await contact.save(null, { useMasterKey: true });
+          console.log('[Contact] Updated profile for:', profile.first_name, profile.last_name);
+        }
+      }
+    } catch (err) {
+      console.error('[Contact] Profile refresh error:', err.message);
+    }
+    return contact;
+  }
+  
   if (contact) return contact;
 
   // Fetch profile from Graph API
@@ -1353,6 +1376,78 @@ async function sendAIResponse(business, conversation, senderPsid, aiResponse) {
 const processedMessages = new Map();
 const DEDUP_TTL_MS = 60000; // 1 minute TTL
 
+// ─── Lead Info Extraction ───
+function extractLeadInfo(text) {
+  const info = {};
+  
+  // Extract email
+  const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch) info.email = emailMatch[0].toLowerCase();
+  
+  // Extract Philippine phone number (various formats)
+  const phonePatterns = [
+    /(\+63|0)(9\d{9})/,           // +639123456789 or 09123456789
+    /09\d{2}[-\s]?\d{3}[-\s]?\d{4}/, // 0912-345-6789 or 0912 345 6789
+    /9\d{9}/,                      // 9123456789
+  ];
+  for (const pattern of phonePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      let phone = match[0].replace(/[-\s]/g, '');
+      if (phone.startsWith('9') && phone.length === 10) phone = '0' + phone;
+      if (phone.startsWith('+63')) phone = '0' + phone.slice(3);
+      info.phone = phone;
+      break;
+    }
+  }
+  
+  // Extract location hints (Philippine provinces/cities)
+  const locations = ['Manila', 'Quezon City', 'Makati', 'Cebu', 'Davao', 'Batangas', 
+    'Cavite', 'Laguna', 'Bulacan', 'Pampanga', 'Rizal', 'Taguig', 'Pasig', 'Caloocan',
+    'Iloilo', 'Bacolod', 'Cagayan', 'Zamboanga', 'General Santos', 'Antipolo'];
+  const lowerText = text.toLowerCase();
+  for (const loc of locations) {
+    if (lowerText.includes(loc.toLowerCase())) {
+      info.location = loc;
+      break;
+    }
+  }
+  
+  return Object.keys(info).length > 0 ? info : null;
+}
+
+// Update contact with extracted lead info
+async function updateContactWithLeadInfo(contact, leadInfo) {
+  let updated = false;
+  
+  if (leadInfo.email && !contact.get('email')) {
+    contact.set('email', leadInfo.email);
+    updated = true;
+    console.log('[Lead] Captured email:', leadInfo.email);
+  }
+  
+  if (leadInfo.phone && !contact.get('phone')) {
+    contact.set('phone', leadInfo.phone);
+    updated = true;
+    console.log('[Lead] Captured phone:', leadInfo.phone);
+  }
+  
+  if (leadInfo.location && !contact.get('location')) {
+    contact.set('location', leadInfo.location);
+    updated = true;
+    console.log('[Lead] Captured location:', leadInfo.location);
+  }
+  
+  if (updated) {
+    contact.set('isLead', true);
+    contact.set('leadCapturedAt', new Date());
+    await contact.save(null, { useMasterKey: true });
+    console.log('[Lead] Contact updated with lead info for PSID:', contact.get('psid'));
+  }
+  
+  return updated;
+}
+
 function isDuplicateMessage(mid) {
   if (!mid) return false;
   if (processedMessages.has(mid)) {
@@ -1417,6 +1512,14 @@ async function handleMessagingEvent(entry) {
         msg.set('rawPayload', event.message);
         msg.set('timestamp', event.timestamp ? new Date(event.timestamp) : new Date());
         await msg.save(null, { useMasterKey: true });
+
+        // 🎯 LEAD CAPTURE: Extract email, phone, location from message
+        if (event.message.text) {
+          const leadInfo = extractLeadInfo(event.message.text);
+          if (leadInfo) {
+            await updateContactWithLeadInfo(contact, leadInfo);
+          }
+        }
 
         // TIER 3 #12: Track A/B test conversion if this is a response to a tested flow
         const lastAbTestId = conversation.get('lastAbTestId');
