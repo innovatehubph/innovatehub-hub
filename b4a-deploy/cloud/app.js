@@ -276,6 +276,35 @@ async function processBotFlow(business, conversation, messageText) {
             },
           },
         };
+      } else if (step.type === 'lead_magnet') {
+        // Deliver a lead magnet inline within a bot flow
+        try {
+          const magnetQuery = new Parse.Query('LeadMagnet');
+          magnetQuery.equalTo('business', business);
+          if (step.leadMagnetId) {
+            const lm = await magnetQuery.get(step.leadMagnetId, { useMasterKey: true });
+            const deliveryMsg = lm.get('deliveryMessage') || step.content || 'Here is your download!';
+            const promoCode = lm.get('promoCode') || '';
+            let msgText = deliveryMsg;
+            if (promoCode) msgText += '\n\nYour promo code: ' + promoCode;
+            messagePayload = { text: msgText };
+            lm.increment('downloadCount');
+            await lm.save(null, { useMasterKey: true });
+
+            // Send content URL as follow-up if exists
+            const contentUrl = lm.get('contentUrl');
+            if (contentUrl) {
+              await sendFbMessage(pageAccessToken, psid, {
+                attachment: { type: 'file', payload: { url: contentUrl, is_reusable: true } },
+              });
+            }
+          } else {
+            messagePayload = { text: step.content || 'Lead magnet not configured.' };
+          }
+        } catch (lmErr) {
+          console.error('[processBotFlow] lead_magnet step error:', lmErr.message);
+          messagePayload = { text: step.content || 'Sorry, we could not retrieve that resource right now.' };
+        }
       } else {
         // Default: treat as text
         messagePayload = { text: step.content || JSON.stringify(step) };
@@ -455,10 +484,28 @@ async function handleMessagingEvent(entry) {
         msg.set('timestamp', event.timestamp ? new Date(event.timestamp) : new Date());
         await msg.save(null, { useMasterKey: true });
 
-        // Try bot flow with the postback payload
+        // Handle UNSUBSCRIBE postback — pause all nurture enrollments
         const payload = event.postback.payload || event.postback.title || '';
+        if (payload === 'UNSUBSCRIBE') {
+          try {
+            const enrollQuery = new Parse.Query('NurtureEnrollment');
+            enrollQuery.equalTo('contact', contact);
+            enrollQuery.equalTo('status', 'active');
+            const activeEnrollments = await enrollQuery.find({ useMasterKey: true });
+            for (const enrollment of activeEnrollments) {
+              enrollment.set('status', 'cancelled');
+              await enrollment.save(null, { useMasterKey: true });
+            }
+            const token = await getPageAccessToken(business);
+            await sendFbMessage(token, senderPsid, 'You have been unsubscribed from automated messages. You can still message us anytime!');
+          } catch (unsubErr) {
+            console.error('[handleMessagingEvent] Unsubscribe error:', unsubErr.message);
+          }
+        }
+
+        // Try bot flow with the postback payload
         const botHandled = await processBotFlow(business, conversation, payload);
-        if (!botHandled) {
+        if (!botHandled && payload !== 'UNSUBSCRIBE') {
           conversation.set('status', 'pending');
           await conversation.save(null, { useMasterKey: true });
         }
@@ -742,14 +789,11 @@ app.get('/facebook/webhook', function (req, res) {
 // =============================================================================
 // Webhook Event Handler (POST)
 // =============================================================================
-app.post('/facebook/webhook', function (req, res) {
-  // Respond immediately — Facebook requires response within 20 seconds
-  res.status(200).send('EVENT_RECEIVED');
-
+app.post('/facebook/webhook', async function (req, res) {
   const body = req.body;
 
-  // Log raw payload to WebhookLog asynchronously
-  (async function () {
+  try {
+    // Log raw payload to WebhookLog
     try {
       const log = new Parse.Object('WebhookLog');
       log.set('objectType', body.object || 'unknown');
@@ -759,51 +803,64 @@ app.post('/facebook/webhook', function (req, res) {
     } catch (logErr) {
       console.error('[Webhook] Failed to save WebhookLog:', logErr.message);
     }
-  })();
 
-  // Route events based on type
-  if (body.object === 'page') {
-    const entries = body.entry || [];
+    // Route events based on type
+    if (body.object === 'page') {
+      const entries = body.entry || [];
 
-    for (const entry of entries) {
-      // Messaging events (DMs)
-      if (entry.messaging && entry.messaging.length > 0) {
-        handleMessagingEvent(entry).catch(function (err) {
-          console.error('[Webhook] handleMessagingEvent error:', err.message, err.stack);
-        });
-      }
-
-      // Page changes (feed, leadgen)
-      if (entry.changes && entry.changes.length > 0) {
-        const hasLeadgen = entry.changes.some(function (c) {
-          return c.field === 'leadgen';
-        });
-        const hasFeed = entry.changes.some(function (c) {
-          return c.field === 'feed';
-        });
-
-        if (hasLeadgen) {
-          handleLeadGenEvent(entry).catch(function (err) {
-            console.error('[Webhook] handleLeadGenEvent error:', err.message, err.stack);
-          });
+      for (const entry of entries) {
+        // Messaging events (DMs)
+        if (entry.messaging && entry.messaging.length > 0) {
+          try {
+            await handleMessagingEvent(entry);
+          } catch (err) {
+            console.error('[Webhook] handleMessagingEvent error:', err.message, err.stack);
+          }
         }
 
-        if (hasFeed) {
-          handleFeedChange(entry).catch(function (err) {
-            console.error('[Webhook] handleFeedChange error:', err.message, err.stack);
+        // Page changes (feed, leadgen)
+        if (entry.changes && entry.changes.length > 0) {
+          const hasLeadgen = entry.changes.some(function (c) {
+            return c.field === 'leadgen';
           });
+          const hasFeed = entry.changes.some(function (c) {
+            return c.field === 'feed';
+          });
+
+          if (hasLeadgen) {
+            try {
+              await handleLeadGenEvent(entry);
+            } catch (err) {
+              console.error('[Webhook] handleLeadGenEvent error:', err.message, err.stack);
+            }
+          }
+
+          if (hasFeed) {
+            try {
+              await handleFeedChange(entry);
+            } catch (err) {
+              console.error('[Webhook] handleFeedChange error:', err.message, err.stack);
+            }
+          }
         }
       }
-    }
-  } else if (body.object === 'instagram') {
-    const entries = body.entry || [];
+    } else if (body.object === 'instagram') {
+      const entries = body.entry || [];
 
-    for (const entry of entries) {
-      handleInstagramEvent(entry).catch(function (err) {
-        console.error('[Webhook] handleInstagramEvent error:', err.message, err.stack);
-      });
+      for (const entry of entries) {
+        try {
+          await handleInstagramEvent(entry);
+        } catch (err) {
+          console.error('[Webhook] handleInstagramEvent error:', err.message, err.stack);
+        }
+      }
+    } else {
+      console.warn('[Webhook] Unknown object type:', body.object);
     }
-  } else {
-    console.warn('[Webhook] Unknown object type:', body.object);
+  } catch (err) {
+    console.error('[Webhook] Top-level error:', err.message, err.stack);
   }
+
+  // Respond after processing (Facebook allows up to 20 seconds)
+  res.status(200).send('EVENT_RECEIVED');
 });

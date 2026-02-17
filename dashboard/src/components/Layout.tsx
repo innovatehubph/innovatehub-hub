@@ -3,9 +3,10 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, MessageSquare, Bot, FileText,
   Megaphone, ShoppingBag, Package, Key, Webhook, Users,
-  Facebook, Settings, ChevronLeft, ChevronRight, Menu, Wand2
+  Facebook, Settings, ChevronLeft, ChevronRight, Menu, Wand2,
+  Magnet, Mail, UserCheck, LogOut
 } from 'lucide-react';
-import { BUSINESSES } from '../config/parse';
+import Parse, { BUSINESSES } from '../config/parse';
 import ChatWidget from './ChatWidget';
 
 const navItems = [
@@ -14,6 +15,9 @@ const navItems = [
   { path: '/messenger', label: 'Messenger', icon: MessageSquare },
   { path: '/bot-flows', label: 'Bot Flows', icon: Bot },
   { path: '/pages', label: 'Page Management', icon: FileText },
+  { path: '/lead-magnets', label: 'Lead Magnets', icon: Magnet },
+  { path: '/nurture-sequences', label: 'Nurture Sequences', icon: Mail },
+  { path: '/agent-pipeline', label: 'Agent Pipeline', icon: UserCheck },
   { path: '/campaigns', label: 'Ads & Campaigns', icon: Megaphone },
   { path: '/products', label: 'Products', icon: ShoppingBag },
   { path: '/orders', label: 'Orders', icon: Package },
@@ -90,8 +94,15 @@ export default function Layout({ children, activeBusiness, onBusinessChange }: L
               ))}
             </select>
           </div>
-          <div className="text-sm text-slate-400">
-            {businessName}
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-slate-400">{businessName}</span>
+            <button
+              onClick={async () => { await Parse.User.logOut(); window.location.reload(); }}
+              className="flex items-center gap-1 text-sm text-slate-400 hover:text-red-400 transition-colors"
+              title="Sign out"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         </header>
 

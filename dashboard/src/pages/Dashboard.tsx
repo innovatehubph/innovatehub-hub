@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MessageSquare, Users, Target, ShoppingBag, Megaphone, Webhook, ArrowRight } from 'lucide-react';
+import { MessageSquare, Users, Target, ShoppingBag, Megaphone, Webhook, ArrowRight, Magnet, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Parse from '../config/parse';
 import StatCard from '../components/StatCard';
@@ -12,6 +12,7 @@ export default function Dashboard({ businessId }: DashboardProps) {
   const [stats, setStats] = useState({
     messages: 0, conversations: 0, leads: 0,
     products: 0, campaigns: 0, webhookLogs: 0,
+    leadMagnetDownloads: 0, activeNurture: 0,
   });
   const [loading, setLoading] = useState(true);
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
@@ -31,9 +32,36 @@ export default function Dashboard({ businessId }: DashboardProps) {
           return q.count({ useMasterKey: true });
         }));
 
+        // Fetch lead magnet download total
+        let magnetDownloads = 0;
+        try {
+          const magnetQuery = new Parse.Query('LeadMagnet');
+          if (businessId) {
+            const bPtr = new Parse.Object('Business');
+            bPtr.id = businessId;
+            magnetQuery.equalTo('business', bPtr);
+          }
+          const magnets = await magnetQuery.find({ useMasterKey: true });
+          magnetDownloads = magnets.reduce((sum: number, m: any) => sum + (m.get('downloadCount') || 0), 0);
+        } catch (_) { /* class may not exist yet */ }
+
+        // Fetch active nurture enrollments count
+        let activeNurture = 0;
+        try {
+          const nurtureQuery = new Parse.Query('NurtureEnrollment');
+          if (businessId) {
+            const bPtr = new Parse.Object('Business');
+            bPtr.id = businessId;
+            nurtureQuery.equalTo('business', bPtr);
+          }
+          nurtureQuery.equalTo('status', 'active');
+          activeNurture = await nurtureQuery.count({ useMasterKey: true });
+        } catch (_) { /* class may not exist yet */ }
+
         setStats({
           messages: counts[0], conversations: counts[1], leads: counts[2],
           products: counts[3], campaigns: counts[4], webhookLogs: counts[5],
+          leadMagnetDownloads: magnetDownloads, activeNurture: activeNurture,
         });
 
         const logQuery = new Parse.Query('WebhookLog');
@@ -76,6 +104,8 @@ export default function Dashboard({ businessId }: DashboardProps) {
         <StatCard title="Products" value={stats.products} icon={ShoppingBag} color="yellow" loading={loading} />
         <StatCard title="Ad Campaigns" value={stats.campaigns} icon={Megaphone} color="cyan" loading={loading} />
         <StatCard title="Webhook Events" value={stats.webhookLogs} icon={Webhook} color="red" loading={loading} />
+        <StatCard title="Magnet Downloads" value={stats.leadMagnetDownloads} icon={Magnet} color="purple" loading={loading} />
+        <StatCard title="Active Nurture" value={stats.activeNurture} icon={Mail} color="cyan" loading={loading} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -79,6 +79,38 @@ async function callSendApi(pageAccessToken, recipientPsid, messagePayload) {
   return data;
 }
 
+/**
+ * Send a message via the Facebook Send API with MESSAGE_TAG for >24hr messaging.
+ * Uses CONFIRMED_EVENT_UPDATE tag for lead form follow-ups.
+ */
+async function callSendApiWithTag(pageAccessToken, recipientPsid, messagePayload, tag) {
+  const url = GRAPH_API_BASE + '/me/messages?access_token=' + pageAccessToken;
+
+  const body = {
+    recipient: { id: recipientPsid },
+    messaging_type: 'MESSAGE_TAG',
+    tag: tag || 'CONFIRMED_EVENT_UPDATE',
+  };
+
+  if (typeof messagePayload === 'string') {
+    body.message = { text: messagePayload };
+  } else {
+    body.message = messagePayload;
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error('Send API (tagged) error: ' + JSON.stringify(data));
+  }
+  return data;
+}
+
 // =============================================================================
 // Cloud Functions
 // =============================================================================
@@ -1160,8 +1192,12 @@ Parse.Cloud.beforeSave('Message', async function (request) {
 });
 
 /**
- * afterSave FbLead — When a new lead is created, find/create a MessengerContact
- * and trigger a welcome message if a BotFlow exists for 'new_lead'.
+ * afterSave FbLead — When a new lead is created:
+ * 1. Find/create a MessengerContact and link it
+ * 2. Check for LeadMagnet linked to formId → auto-deliver via Messenger
+ * 3. Check for matching NurtureSequence → auto-enroll
+ * 4. Detect agent recruitment leads → set pipelineStage
+ * 5. Trigger 'new_lead' BotFlow if exists
  */
 Parse.Cloud.afterSave('FbLead', async function (request) {
   const fbLead = request.object;
@@ -1179,12 +1215,9 @@ Parse.Cloud.afterSave('FbLead', async function (request) {
       }
 
       const fieldData = fbLead.get('fieldData') || {};
+      const formId = fbLead.get('formId') || '';
 
       // Find or create a MessengerContact from the lead data
-      const contactQuery = new Parse.Query('MessengerContact');
-      contactQuery.equalTo('business', businessObj);
-
-      // Try to match by email or phone
       const email = fieldData.email || fieldData.work_email || '';
       const phone = fieldData.phone_number || fieldData.phone || '';
 
@@ -1205,7 +1238,6 @@ Parse.Cloud.afterSave('FbLead', async function (request) {
       }
 
       if (!contact) {
-        // Create a new contact from lead data
         contact = new Parse.Object('MessengerContact');
         contact.set('business', businessObj);
         contact.set('channel', 'lead_form');
@@ -1213,7 +1245,7 @@ Parse.Cloud.afterSave('FbLead', async function (request) {
         contact.set('lastName', fieldData.last_name || '');
         contact.set('email', email);
         contact.set('phone', phone);
-        contact.set('psid', ''); // No PSID for lead form contacts
+        contact.set('psid', '');
         contact.set('source', 'lead_ad');
         contact.set('lastInteractionAt', new Date());
         await contact.save(null, { useMasterKey: true });
@@ -1221,60 +1253,150 @@ Parse.Cloud.afterSave('FbLead', async function (request) {
 
       // Link the lead to the contact
       fbLead.set('contact', contact);
+
+      // --- Detect agent recruitment leads → set pipeline stage ---
+      const agentKeywords = ['agent', 'partner', 'negosyo', 'franchise', 'business opportunity'];
+      const allFieldText = Object.values(fieldData).join(' ').toLowerCase();
+      const isAgentLead = agentKeywords.some(function (kw) { return allFieldText.includes(kw); });
+
+      if (isAgentLead) {
+        fbLead.set('pipelineStage', 'inquiry');
+        fbLead.set('agentType', fieldData.agent_type || 'standard');
+        fbLead.set('stageChangedAt', new Date());
+      }
+
       await fbLead.save(null, { useMasterKey: true });
 
-      // Check for a BotFlow triggered by 'new_lead'
-      const flowQuery = new Parse.Query('BotFlow');
-      flowQuery.equalTo('business', businessObj);
-      flowQuery.equalTo('isActive', true);
-      const flows = await flowQuery.find({ useMasterKey: true });
+      const psid = contact.get('psid');
+      let token;
+      try {
+        token = await getPageAccessToken(businessObj);
+      } catch (err) {
+        console.error('[afterSave FbLead] Cannot get token:', err.message);
+        token = null;
+      }
 
-      for (const flow of flows) {
-        const keywords = flow.get('triggerKeywords') || [];
-        if (!keywords.some(function (kw) { return kw.toLowerCase() === 'new_lead'; })) {
-          continue;
-        }
-
-        // This flow is for new leads — send the welcome message
-        const psid = contact.get('psid');
-        if (!psid) {
-          // Cannot send a message without a PSID
-          console.log('[afterSave FbLead] Contact has no PSID, cannot send welcome message');
-          break;
-        }
-
-        const steps = flow.get('steps') || [];
-        let token;
+      // --- Check for LeadMagnet linked to formId → auto-deliver ---
+      if (formId && psid && token) {
         try {
-          token = await getPageAccessToken(businessObj);
-        } catch (err) {
-          console.error('[afterSave FbLead] Cannot get token:', err.message);
-          break;
-        }
+          const magnetQuery = new Parse.Query('LeadMagnet');
+          magnetQuery.equalTo('business', businessObj);
+          magnetQuery.equalTo('formId', formId);
+          magnetQuery.equalTo('isActive', true);
+          const magnet = await magnetQuery.first({ useMasterKey: true });
 
-        for (const step of steps) {
-          let messagePayload;
-          if (step.type === 'text') {
-            messagePayload = { text: step.content };
-          } else if (step.type === 'image') {
-            messagePayload = {
-              attachment: { type: 'image', payload: { url: step.url, is_reusable: true } },
-            };
-          } else if (step.type === 'quick_replies') {
-            messagePayload = {
-              text: step.content,
-              quick_replies: (step.quickReplies || []).map(function (qr) {
-                return { content_type: 'text', title: qr.title, payload: qr.payload || qr.title };
-              }),
-            };
-          } else {
-            messagePayload = { text: step.content || '' };
+          if (magnet) {
+            const deliveryMsg = magnet.get('deliveryMessage') || 'Here is your download!';
+            const contentUrl = magnet.get('contentUrl') || '';
+            const promoCode = magnet.get('promoCode') || '';
+
+            let messageText = deliveryMsg;
+            if (promoCode) {
+              messageText += '\n\nYour promo code: ' + promoCode;
+            }
+
+            await callSendApi(token, psid, { text: messageText });
+
+            if (contentUrl) {
+              await callSendApi(token, psid, {
+                attachment: {
+                  type: 'file',
+                  payload: { url: contentUrl, is_reusable: true },
+                },
+              });
+            }
+
+            magnet.increment('downloadCount');
+            await magnet.save(null, { useMasterKey: true });
+            console.log('[afterSave FbLead] Delivered lead magnet: ' + magnet.get('name'));
+          }
+        } catch (magnetErr) {
+          console.error('[afterSave FbLead] LeadMagnet delivery error:', magnetErr.message);
+        }
+      }
+
+      // --- Check for matching NurtureSequence → auto-enroll ---
+      try {
+        const seqQuery = new Parse.Query('NurtureSequence');
+        seqQuery.equalTo('business', businessObj);
+        seqQuery.equalTo('isActive', true);
+        seqQuery.equalTo('triggerEvent', 'new_lead');
+        const sequences = await seqQuery.find({ useMasterKey: true });
+
+        for (const seq of sequences) {
+          const audience = seq.get('targetAudience') || 'both';
+          if (audience === 'agent' && !isAgentLead) continue;
+          if (audience === 'customer' && isAgentLead) continue;
+
+          // Check if already enrolled
+          const existingEnroll = new Parse.Query('NurtureEnrollment');
+          existingEnroll.equalTo('lead', fbLead);
+          existingEnroll.equalTo('sequence', seq);
+          const alreadyEnrolled = await existingEnroll.first({ useMasterKey: true });
+          if (alreadyEnrolled) continue;
+
+          const steps = seq.get('steps') || [];
+          if (steps.length === 0) continue;
+
+          const firstStep = steps[0];
+          const delayMs = ((firstStep.delayDays || 0) * 86400000) + ((firstStep.delayHours || 0) * 3600000);
+
+          const enrollment = new Parse.Object('NurtureEnrollment');
+          enrollment.set('business', businessObj);
+          enrollment.set('lead', fbLead);
+          enrollment.set('contact', contact);
+          enrollment.set('sequence', seq);
+          enrollment.set('currentStep', 0);
+          enrollment.set('status', 'active');
+          enrollment.set('enrolledAt', new Date());
+          enrollment.set('nextSendAt', new Date(Date.now() + delayMs));
+          await enrollment.save(null, { useMasterKey: true });
+          console.log('[afterSave FbLead] Enrolled in nurture: ' + seq.get('name'));
+        }
+      } catch (nurtureErr) {
+        console.error('[afterSave FbLead] Nurture enrollment error:', nurtureErr.message);
+      }
+
+      // --- Trigger 'new_lead' BotFlow ---
+      if (psid && token) {
+        const flowQuery = new Parse.Query('BotFlow');
+        flowQuery.equalTo('business', businessObj);
+        flowQuery.equalTo('isActive', true);
+        const flows = await flowQuery.find({ useMasterKey: true });
+
+        for (const flow of flows) {
+          const keywords = flow.get('triggerKeywords') || [];
+          if (!keywords.some(function (kw) { return kw.toLowerCase() === 'new_lead'; })) {
+            continue;
           }
 
-          await callSendApi(token, psid, messagePayload);
-        }
+          const steps = flow.get('steps') || [];
+          for (const step of steps) {
+            let messagePayload;
+            if (step.type === 'text') {
+              messagePayload = { text: step.content };
+            } else if (step.type === 'image') {
+              messagePayload = {
+                attachment: { type: 'image', payload: { url: step.url, is_reusable: true } },
+              };
+            } else if (step.type === 'quick_replies') {
+              messagePayload = {
+                text: step.content,
+                quick_replies: (step.quickReplies || []).map(function (qr) {
+                  return { content_type: 'text', title: qr.title, payload: qr.payload || qr.title };
+                }),
+              };
+            } else {
+              messagePayload = { text: step.content || '' };
+            }
 
-        break; // Only execute the first matching flow
+            await callSendApi(token, psid, messagePayload);
+          }
+
+          break; // Only execute the first matching flow
+        }
+      } else if (!psid) {
+        console.log('[afterSave FbLead] Contact has no PSID, cannot send messages');
       }
     } catch (err) {
       console.error('[afterSave FbLead] Error:', err.message, err.stack);
@@ -1344,6 +1466,466 @@ Parse.Cloud.afterSave('PagePost', async function (request) {
       console.error('[afterSave PagePost] Manual publish error:', err.message, err.stack);
     }
   }
+});
+
+// =============================================================================
+// Marketing Automation Cloud Functions
+// =============================================================================
+
+/**
+ * deliverLeadMagnet — Manually deliver a lead magnet to a contact.
+ * Params: businessId, leadMagnetId, contactId
+ */
+Parse.Cloud.define('deliverLeadMagnet', async function (request) {
+  const { businessId, leadMagnetId, contactId } = request.params;
+
+  if (!businessId || !leadMagnetId || !contactId) {
+    throw new Parse.Error(Parse.Error.INVALID_VALUE, 'businessId, leadMagnetId, and contactId are required');
+  }
+
+  const business = await getBusinessById(businessId);
+  const token = await getPageAccessToken(business);
+
+  const magnetQuery = new Parse.Query('LeadMagnet');
+  magnetQuery.equalTo('business', business);
+  const magnet = await magnetQuery.get(leadMagnetId, { useMasterKey: true });
+
+  const contactQuery = new Parse.Query('MessengerContact');
+  const contact = await contactQuery.get(contactId, { useMasterKey: true });
+  const psid = contact.get('psid');
+
+  if (!psid) {
+    throw new Parse.Error(Parse.Error.INVALID_VALUE, 'Contact has no Messenger PSID');
+  }
+
+  const deliveryMsg = magnet.get('deliveryMessage') || 'Here is your download!';
+  const contentUrl = magnet.get('contentUrl') || '';
+  const promoCode = magnet.get('promoCode') || '';
+
+  let messageText = deliveryMsg;
+  if (promoCode) {
+    messageText += '\n\nYour promo code: ' + promoCode;
+  }
+
+  await callSendApi(token, psid, { text: messageText });
+
+  if (contentUrl) {
+    await callSendApi(token, psid, {
+      attachment: { type: 'file', payload: { url: contentUrl, is_reusable: true } },
+    });
+  }
+
+  magnet.increment('downloadCount');
+  await magnet.save(null, { useMasterKey: true });
+
+  return { success: true, magnetName: magnet.get('name'), deliveredTo: psid };
+});
+
+/**
+ * enrollInNurture — Manually enroll a lead in a nurture sequence.
+ * Params: businessId, leadId, sequenceId
+ */
+Parse.Cloud.define('enrollInNurture', async function (request) {
+  const { businessId, leadId, sequenceId } = request.params;
+
+  if (!businessId || !leadId || !sequenceId) {
+    throw new Parse.Error(Parse.Error.INVALID_VALUE, 'businessId, leadId, and sequenceId are required');
+  }
+
+  const business = await getBusinessById(businessId);
+
+  const leadQuery = new Parse.Query('FbLead');
+  leadQuery.equalTo('business', business);
+  leadQuery.include('contact');
+  const lead = await leadQuery.get(leadId, { useMasterKey: true });
+
+  const seqQuery = new Parse.Query('NurtureSequence');
+  seqQuery.equalTo('business', business);
+  const sequence = await seqQuery.get(sequenceId, { useMasterKey: true });
+
+  // Check if already enrolled
+  const existingQuery = new Parse.Query('NurtureEnrollment');
+  existingQuery.equalTo('lead', lead);
+  existingQuery.equalTo('sequence', sequence);
+  existingQuery.containedIn('status', ['active', 'paused']);
+  const existing = await existingQuery.first({ useMasterKey: true });
+
+  if (existing) {
+    throw new Parse.Error(Parse.Error.DUPLICATE_VALUE, 'Lead is already enrolled in this sequence');
+  }
+
+  const steps = sequence.get('steps') || [];
+  if (steps.length === 0) {
+    throw new Parse.Error(Parse.Error.INVALID_VALUE, 'Sequence has no steps');
+  }
+
+  const firstStep = steps[0];
+  const delayMs = ((firstStep.delayDays || 0) * 86400000) + ((firstStep.delayHours || 0) * 3600000);
+
+  const contact = lead.get('contact');
+
+  const enrollment = new Parse.Object('NurtureEnrollment');
+  enrollment.set('business', business);
+  enrollment.set('lead', lead);
+  enrollment.set('contact', contact || null);
+  enrollment.set('sequence', sequence);
+  enrollment.set('currentStep', 0);
+  enrollment.set('status', 'active');
+  enrollment.set('enrolledAt', new Date());
+  enrollment.set('nextSendAt', new Date(Date.now() + delayMs));
+  await enrollment.save(null, { useMasterKey: true });
+
+  return { success: true, enrollmentId: enrollment.id, nextSendAt: enrollment.get('nextSendAt').toISOString() };
+});
+
+/**
+ * processNurtureSequences — Cloud Job (runs hourly) — the automation engine.
+ * Finds enrollments where nextSendAt <= now, sends the next step, advances.
+ */
+Parse.Cloud.job('processNurtureSequences', async function (request) {
+  const { message } = request;
+  message('Starting processNurtureSequences job');
+
+  const now = new Date();
+  const enrollQuery = new Parse.Query('NurtureEnrollment');
+  enrollQuery.equalTo('status', 'active');
+  enrollQuery.lessThanOrEqualTo('nextSendAt', now);
+  enrollQuery.include('sequence');
+  enrollQuery.include('contact');
+  enrollQuery.include('lead');
+  enrollQuery.include('business');
+  enrollQuery.limit(200);
+  const enrollments = await enrollQuery.find({ useMasterKey: true });
+
+  let sent = 0;
+  let completed = 0;
+  let errors = 0;
+
+  for (const enrollment of enrollments) {
+    try {
+      const sequence = enrollment.get('sequence');
+      const contact = enrollment.get('contact');
+      let business = enrollment.get('business');
+
+      if (!sequence || !contact || !business) {
+        console.error('[processNurtureSequences] Missing data for enrollment ' + enrollment.id);
+        errors++;
+        continue;
+      }
+
+      // Fetch business if just a pointer
+      if (!business.get('name')) {
+        business = await new Parse.Query('Business').get(business.id, { useMasterKey: true });
+      }
+
+      const psid = contact.get('psid');
+      if (!psid) {
+        console.log('[processNurtureSequences] Contact has no PSID, skipping enrollment ' + enrollment.id);
+        continue;
+      }
+
+      const steps = sequence.get('steps') || [];
+      const currentStep = enrollment.get('currentStep') || 0;
+
+      if (currentStep >= steps.length) {
+        enrollment.set('status', 'completed');
+        await enrollment.save(null, { useMasterKey: true });
+        completed++;
+        continue;
+      }
+
+      const step = steps[currentStep];
+      let token;
+      try {
+        token = await getPageAccessToken(business);
+      } catch (tokenErr) {
+        console.error('[processNurtureSequences] Cannot get token for business ' + business.id);
+        errors++;
+        continue;
+      }
+
+      // Build message payload based on step type
+      let messagePayload;
+      const msgType = step.messageType || step.type || 'text';
+
+      if (msgType === 'text') {
+        messagePayload = { text: step.content };
+      } else if (msgType === 'quick_replies') {
+        messagePayload = {
+          text: step.content,
+          quick_replies: (step.quickReplies || []).map(function (qr) {
+            return { content_type: 'text', title: qr.title, payload: qr.payload || qr.title };
+          }),
+        };
+      } else if (msgType === 'buttons') {
+        const btns = (step.buttons || []).map(function (btn) {
+          if (btn.url) {
+            return { type: 'web_url', url: btn.url, title: btn.title };
+          }
+          return { type: 'postback', title: btn.title, payload: btn.payload || btn.title };
+        });
+        // Add unsubscribe button
+        btns.push({ type: 'postback', title: 'Unsubscribe', payload: 'UNSUBSCRIBE' });
+        messagePayload = {
+          attachment: {
+            type: 'template',
+            payload: { template_type: 'button', text: step.content, buttons: btns.slice(0, 3) },
+          },
+        };
+      } else if (msgType === 'image') {
+        messagePayload = {
+          attachment: { type: 'image', payload: { url: step.url || step.content, is_reusable: true } },
+        };
+      } else {
+        messagePayload = { text: step.content || '' };
+      }
+
+      // Use MESSAGE_TAG since this is >24hrs after initial interaction
+      await callSendApiWithTag(token, psid, messagePayload, 'CONFIRMED_EVENT_UPDATE');
+      sent++;
+
+      // Advance to next step
+      const nextStepIdx = currentStep + 1;
+      enrollment.set('currentStep', nextStepIdx);
+      enrollment.set('lastSentAt', new Date());
+
+      if (nextStepIdx >= steps.length) {
+        enrollment.set('status', 'completed');
+        enrollment.set('nextSendAt', null);
+        completed++;
+      } else {
+        const nextStep = steps[nextStepIdx];
+        const nextDelayMs = ((nextStep.delayDays || 0) * 86400000) + ((nextStep.delayHours || 0) * 3600000);
+        enrollment.set('nextSendAt', new Date(Date.now() + nextDelayMs));
+      }
+
+      await enrollment.save(null, { useMasterKey: true });
+    } catch (err) {
+      console.error('[processNurtureSequences] Error for enrollment ' + enrollment.id + ':', err.message);
+      errors++;
+    }
+  }
+
+  message('processNurtureSequences complete: sent=' + sent + ', completed=' + completed + ', errors=' + errors);
+});
+
+/**
+ * seedPlatapayData — Create PlataPay bot flows, lead magnets, and nurture sequences.
+ * Params: businessId (the PlataPay business ID)
+ */
+Parse.Cloud.define('seedPlatapayData', async function (request) {
+  const { businessId } = request.params;
+  if (!businessId) {
+    throw new Parse.Error(Parse.Error.INVALID_VALUE, 'businessId is required');
+  }
+
+  const business = await getBusinessById(businessId);
+  const results = { botFlows: 0, leadMagnets: 0, nurtureSequences: 0 };
+
+  // --- Bot Flows ---
+  const botFlowDefs = [
+    {
+      name: 'Agent Recruitment',
+      channel: 'messenger',
+      triggerKeywords: ['agent', 'partner', 'earn', 'negosyo', 'kita'],
+      steps: [
+        { type: 'text', content: 'Interested to become a PlataPay Agent? Great choice! 💼\n\nAs a PlataPay agent, you can earn from:\n• Bills payment commissions\n• E-load transactions\n• Remittance services\n• QR payments' },
+        { type: 'quick_replies', content: 'What would you like to know?', quickReplies: [
+          { title: 'How to Apply', payload: 'AGENT_HOW_TO_APPLY' },
+          { title: 'Requirements', payload: 'AGENT_REQUIREMENTS' },
+          { title: 'Earnings', payload: 'AGENT_EARNINGS' },
+        ]},
+      ],
+    },
+    {
+      name: 'Agent Application Process',
+      channel: 'messenger',
+      triggerKeywords: ['how to apply', 'AGENT_HOW_TO_APPLY', 'apply as agent', 'mag-apply'],
+      steps: [
+        { type: 'text', content: 'Here\'s how to become a PlataPay Agent:\n\n1️⃣ Fill out the application form\n2️⃣ Submit required documents\n3️⃣ Attend online orientation\n4️⃣ Set up your PlataPay terminal\n5️⃣ Start earning!' },
+        { type: 'buttons', content: 'Ready to start your application?', buttons: [
+          { title: 'Apply Now', url: 'https://platapay.ph/agent-signup' },
+          { title: 'Talk to Agent Support', payload: 'AGENT_SUPPORT' },
+        ]},
+      ],
+    },
+    {
+      name: 'Agent Requirements',
+      channel: 'messenger',
+      triggerKeywords: ['requirements', 'AGENT_REQUIREMENTS', 'kailangan', 'need what'],
+      steps: [
+        { type: 'text', content: 'PlataPay Agent Requirements:\n\n📋 Valid Government ID\n📱 Smartphone with internet\n📍 Physical location (store/shop preferred)\n💰 Minimum top-up deposit\n📧 Active email address\n\nNo franchise fee required!' },
+        { type: 'quick_replies', content: 'Need more info?', quickReplies: [
+          { title: 'Apply Now', payload: 'AGENT_HOW_TO_APPLY' },
+          { title: 'Earnings Info', payload: 'AGENT_EARNINGS' },
+        ]},
+      ],
+    },
+    {
+      name: 'Agent Earnings',
+      channel: 'messenger',
+      triggerKeywords: ['earnings', 'how much', 'AGENT_EARNINGS', 'magkano kitain', 'income'],
+      steps: [
+        { type: 'text', content: 'PlataPay Agent Earning Potential:\n\n💵 Bills Payment: ₱3-₱15 per transaction\n📱 E-Load: 2-5% commission\n💸 Remittance: ₱25-₱50 per transaction\n📊 Average: ₱15,000-₱40,000/month\n\nTop agents earn ₱80,000+/month!' },
+        { type: 'buttons', content: 'Ready to start earning?', buttons: [
+          { title: 'Apply Now', url: 'https://platapay.ph/agent-signup' },
+          { title: 'Download Guide', payload: 'DOWNLOAD_AGENT_GUIDE' },
+        ]},
+      ],
+    },
+    {
+      name: 'Customer Services',
+      channel: 'messenger',
+      triggerKeywords: ['bills', 'load', 'remit', 'pay', 'padala', 'bayad', 'services'],
+      steps: [
+        { type: 'text', content: 'PlataPay Services:\n\n💡 Bills Payment — electricity, water, internet, and more\n📱 E-Load — all networks\n💸 Remittance — send money nationwide\n🏪 QR Payments — pay and get paid easily' },
+        { type: 'quick_replies', content: 'How can we help you today?', quickReplies: [
+          { title: 'Find Agent', payload: 'FIND_NEAREST_AGENT' },
+          { title: 'Download App', payload: 'DOWNLOAD_APP' },
+          { title: 'Become Agent', payload: 'AGENT_HOW_TO_APPLY' },
+        ]},
+      ],
+    },
+    {
+      name: 'New Lead Welcome',
+      channel: 'messenger',
+      triggerKeywords: ['new_lead'],
+      steps: [
+        { type: 'text', content: 'Welcome to PlataPay! 🎉 Thank you for your interest.\n\nWe received your details and our team will get in touch shortly.' },
+        { type: 'quick_replies', content: 'In the meantime, what are you interested in?', quickReplies: [
+          { title: 'Become an Agent', payload: 'AGENT_HOW_TO_APPLY' },
+          { title: 'PlataPay Services', payload: 'CUSTOMER_SERVICES' },
+          { title: 'Talk to Support', payload: 'TALK_TO_SUPPORT' },
+        ]},
+      ],
+    },
+  ];
+
+  for (const def of botFlowDefs) {
+    // Skip if already exists
+    const existQuery = new Parse.Query('BotFlow');
+    existQuery.equalTo('business', business);
+    existQuery.equalTo('name', def.name);
+    const exists = await existQuery.first({ useMasterKey: true });
+    if (exists) continue;
+
+    const flow = new Parse.Object('BotFlow');
+    flow.set('business', business);
+    flow.set('name', def.name);
+    flow.set('channel', def.channel);
+    flow.set('triggerKeywords', def.triggerKeywords);
+    flow.set('steps', def.steps);
+    flow.set('isActive', true);
+    await flow.save(null, { useMasterKey: true });
+    results.botFlows++;
+  }
+
+  // --- Lead Magnets ---
+  const magnetDefs = [
+    {
+      name: 'PlataPay Agent Starter Guide',
+      type: 'guide',
+      targetAudience: 'agent',
+      deliveryMessage: 'Here\'s your PlataPay Agent Starter Guide! This covers everything you need to know to start earning as an agent.',
+      contentUrl: '',
+      promoCode: '',
+      isActive: true,
+      downloadCount: 0,
+    },
+    {
+      name: 'First Transaction Free',
+      type: 'promo_code',
+      targetAudience: 'customer',
+      deliveryMessage: 'Welcome to PlataPay! Here\'s a special promo code for your first transaction — enjoy zero fees!',
+      contentUrl: '',
+      promoCode: 'PLATAFREE2026',
+      isActive: true,
+      downloadCount: 0,
+    },
+    {
+      name: 'Agent Earnings Calculator',
+      type: 'guide',
+      targetAudience: 'agent',
+      deliveryMessage: 'Here\'s the PlataPay Agent Earnings Calculator! See how much you can earn based on your location and transaction volume.',
+      contentUrl: '',
+      promoCode: '',
+      isActive: true,
+      downloadCount: 0,
+    },
+  ];
+
+  for (const def of magnetDefs) {
+    const existQuery = new Parse.Query('LeadMagnet');
+    existQuery.equalTo('business', business);
+    existQuery.equalTo('name', def.name);
+    const exists = await existQuery.first({ useMasterKey: true });
+    if (exists) continue;
+
+    const magnet = new Parse.Object('LeadMagnet');
+    magnet.set('business', business);
+    Object.entries(def).forEach(function (entry) { magnet.set(entry[0], entry[1]); });
+    await magnet.save(null, { useMasterKey: true });
+    results.leadMagnets++;
+  }
+
+  // --- Nurture Sequences ---
+  const sequenceDefs = [
+    {
+      name: 'Agent Recruitment 7-Day',
+      targetAudience: 'agent',
+      triggerEvent: 'new_lead',
+      channel: 'messenger',
+      isActive: true,
+      steps: [
+        { stepNumber: 1, delayDays: 0, delayHours: 1, messageType: 'text', content: 'Hi! Thanks for your interest in becoming a PlataPay Agent. Did you know that our agents earn an average of ₱15,000-₱40,000 per month? Let me share more details over the next few days.' },
+        { stepNumber: 2, delayDays: 1, delayHours: 0, messageType: 'buttons', content: '💰 PlataPay agents earn commissions on every transaction:\n\n• Bills: ₱3-₱15 each\n• E-Load: 2-5% commission\n• Remittance: ₱25-₱50 each\n\nThe more transactions, the more you earn!', buttons: [
+          { title: 'Calculate Earnings', url: 'https://platapay.ph/calculator' },
+          { title: 'Apply Now', url: 'https://platapay.ph/agent-signup' },
+        ]},
+        { stepNumber: 3, delayDays: 3, delayHours: 0, messageType: 'text', content: '💡 Agent Success Tip: Top-earning PlataPay agents place their business in high-traffic areas like markets, sari-sari stores, or near schools. They also promote bills payment services since that brings the most repeat customers.' },
+        { stepNumber: 4, delayDays: 5, delayHours: 0, messageType: 'text', content: '🌟 Success Story: "I started as a PlataPay agent 6 months ago in my sari-sari store. Now I earn ₱35,000/month just from the commissions. Best decision I ever made!" — Agent Maria, Quezon City' },
+        { stepNumber: 5, delayDays: 7, delayHours: 0, messageType: 'buttons', content: 'Ready to start your PlataPay Agent journey? Applications are open and there\'s NO franchise fee. Join 5,000+ agents earning daily!', buttons: [
+          { title: 'Apply Now', url: 'https://platapay.ph/agent-signup' },
+          { title: 'Talk to Support', payload: 'AGENT_SUPPORT' },
+        ]},
+      ],
+    },
+    {
+      name: 'Customer Welcome 3-Day',
+      targetAudience: 'customer',
+      triggerEvent: 'new_lead',
+      channel: 'messenger',
+      isActive: true,
+      steps: [
+        { stepNumber: 1, delayDays: 0, delayHours: 2, messageType: 'text', content: 'Welcome to PlataPay! 🎉 You can now pay bills, buy load, and send money — all from your phone or at any PlataPay agent near you.' },
+        { stepNumber: 2, delayDays: 1, delayHours: 0, messageType: 'quick_replies', content: 'What service would you like to try first?', quickReplies: [
+          { title: '💡 Pay Bills', payload: 'SERVICE_BILLS' },
+          { title: '📱 Buy Load', payload: 'SERVICE_LOAD' },
+          { title: '💸 Send Money', payload: 'SERVICE_REMIT' },
+        ]},
+        { stepNumber: 3, delayDays: 3, delayHours: 0, messageType: 'buttons', content: 'Want to find a PlataPay agent near you? Over 5,000 agents nationwide ready to serve you!', buttons: [
+          { title: 'Find Nearest Agent', url: 'https://platapay.ph/find-agent' },
+          { title: 'Download App', url: 'https://platapay.ph/download' },
+        ]},
+      ],
+    },
+  ];
+
+  for (const def of sequenceDefs) {
+    const existQuery = new Parse.Query('NurtureSequence');
+    existQuery.equalTo('business', business);
+    existQuery.equalTo('name', def.name);
+    const exists = await existQuery.first({ useMasterKey: true });
+    if (exists) continue;
+
+    const seq = new Parse.Object('NurtureSequence');
+    seq.set('business', business);
+    Object.entries(def).forEach(function (entry) { seq.set(entry[0], entry[1]); });
+    await seq.save(null, { useMasterKey: true });
+    results.nurtureSequences++;
+  }
+
+  return { success: true, created: results };
 });
 
 // =============================================================================
