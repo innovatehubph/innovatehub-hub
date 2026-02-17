@@ -1046,7 +1046,21 @@ async function processBotFlow(business, conversation, messageText) {
       return false;
     }
 
-    for (const step of steps) {
+    for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
+      // TIER 3 #12: A/B Testing - select variant if available
+      let step = steps[stepIndex];
+      let abTestInfo = null;
+      
+      if (step.variants && step.variants.length > 0) {
+        try {
+          const abResult = await selectABTestVariant(flow, stepIndex);
+          step = abResult.variant;
+          abTestInfo = { testId: abResult.testId, variantId: abResult.variantId };
+        } catch (abErr) {
+          console.error('[A/B] Variant selection error:', abErr.message);
+        }
+      }
+      
       let messagePayload;
 
       if (step.type === 'text') {
@@ -1123,6 +1137,16 @@ async function processBotFlow(business, conversation, messageText) {
       outMsg.set('rawPayload', step);
       outMsg.set('fbMessageId', sendResult.messageId || null);
       outMsg.set('botFlowId', flow.id);
+      
+      // TIER 3 #12: Track A/B test info
+      if (abTestInfo) {
+        outMsg.set('abTestId', abTestInfo.testId);
+        outMsg.set('abVariantId', abTestInfo.variantId);
+        // Store in conversation for conversion tracking on next response
+        conversation.set('lastAbTestId', abTestInfo.testId);
+        conversation.set('lastAbVariantId', abTestInfo.variantId);
+      }
+      
       await outMsg.save(null, { useMasterKey: true });
     }
 
@@ -1281,6 +1305,17 @@ async function handleMessagingEvent(entry) {
         msg.set('timestamp', event.timestamp ? new Date(event.timestamp) : new Date());
         await msg.save(null, { useMasterKey: true });
 
+        // TIER 3 #12: Track A/B test conversion if this is a response to a tested flow
+        const lastAbTestId = conversation.get('lastAbTestId');
+        const lastAbVariantId = conversation.get('lastAbVariantId');
+        if (lastAbTestId && lastAbVariantId) {
+          await trackABTestConversion(lastAbTestId, lastAbVariantId);
+          // Clear after tracking
+          conversation.unset('lastAbTestId');
+          conversation.unset('lastAbVariantId');
+          await conversation.save(null, { useMasterKey: true });
+        }
+        
         // Try AI-powered response first, fall back to bot flows
         if (event.message.text) {
           const aiResponse = await generateAIResponse(business, conversation, contact, event.message.text);
@@ -2720,6 +2755,831 @@ app.get('/data-deletion', (req, res) => {
 });
 
 // =============================================================================
+// TIER 3 #10: Conversation SLA Tracking
+// =============================================================================
+
+async function checkConversationSLA() {
+  console.log('[SLA] Checking conversation SLA compliance...');
+  
+  const now = new Date();
+  const fiveHoursAgo = new Date(now.getTime() - 5 * 60 * 60 * 1000);
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  
+  try {
+    // Find conversations pending for 5+ hours (not yet alerted)
+    const alertQuery = new Parse.Query('Conversation');
+    alertQuery.equalTo('status', 'pending');
+    alertQuery.lessThan('lastMessageAt', fiveHoursAgo);
+    alertQuery.notEqualTo('slaAlertSent', true);
+    alertQuery.include('contact');
+    alertQuery.include('business');
+    alertQuery.limit(100);
+    const alertConversations = await alertQuery.find({ useMasterKey: true });
+
+    let alerts = 0, escalations = 0, errors = 0;
+
+    // Send 5-hour alert emails
+    for (const conv of alertConversations) {
+      try {
+        const contact = conv.get('contact');
+        const contactName = contact ? `${contact.get('firstName') || ''} ${contact.get('lastName') || ''}`.trim() : 'Unknown';
+        const lastMessageAt = conv.get('lastMessageAt');
+        const hoursPending = Math.round((now - lastMessageAt) / (60 * 60 * 1000));
+
+        // Only send alert if under 24 hours (will be escalated otherwise)
+        if (hoursPending < 24) {
+          await sendEmail({
+            to: 'admin@innovatehub.ph',
+            template: 'custom',
+            data: {
+              name: 'Admin',
+              content: `
+                <div class="note" style="background-color:#fff3cd;border-left-color:#ffc107;">
+                  <p><strong>⚠️ SLA Alert: Conversation Pending ${hoursPending} Hours</strong></p>
+                </div>
+                <div class="highlight-box">
+                  <div class="service-item"><strong>Contact:</strong> ${contactName}</div>
+                  <div class="service-item"><strong>PSID:</strong> ${contact ? contact.get('psid') : 'N/A'}</div>
+                  <div class="service-item"><strong>Last Message:</strong> ${lastMessageAt.toLocaleString('en-PH')}</div>
+                  <div class="service-item"><strong>Conversation ID:</strong> ${conv.id}</div>
+                </div>
+                <p>Please respond to this customer as soon as possible to maintain our service quality standards.</p>
+                <div style="text-align:center;margin:30px 0;">
+                  <a href="https://dashboard.innoserver.cloud/conversations/${conv.id}" class="button">View Conversation</a>
+                </div>
+              `
+            },
+            subject: `⚠️ SLA Alert: ${contactName} waiting ${hoursPending} hours for response`
+          });
+          
+          conv.set('slaAlertSent', true);
+          conv.set('slaAlertSentAt', new Date());
+          await conv.save(null, { useMasterKey: true });
+          alerts++;
+        }
+      } catch (err) {
+        errors++;
+        console.error('[SLA] Alert error:', err.message);
+      }
+    }
+
+    // Find conversations pending 24+ hours (not yet escalated)
+    const escalateQuery = new Parse.Query('Conversation');
+    escalateQuery.equalTo('status', 'pending');
+    escalateQuery.lessThan('lastMessageAt', twentyFourHoursAgo);
+    escalateQuery.notEqualTo('slaEscalated', true);
+    escalateQuery.include('contact');
+    escalateQuery.include('business');
+    escalateQuery.limit(50);
+    const escalateConversations = await escalateQuery.find({ useMasterKey: true });
+
+    for (const conv of escalateConversations) {
+      try {
+        const contact = conv.get('contact');
+        const business = conv.get('business');
+        
+        if (!contact || !business) continue;
+        
+        const psid = contact.get('psid');
+        const firstName = contact.get('firstName') || '';
+        
+        let businessObj = business;
+        if (typeof business.fetch === 'function') {
+          try { businessObj = await business.fetch({ useMasterKey: true }); } catch (_) {}
+        }
+
+        // Send apology to customer via Messenger
+        if (psid) {
+          try {
+            const token = await getPageAccessToken(businessObj);
+            const apologyMessage = firstName
+              ? `Hi ${firstName}! We sincerely apologize for the delayed response. 🙏\n\nYour message is important to us. A team member will personally reach out to you very soon.\n\nFor immediate assistance, please call us at +639176851216 or email marketing@innovatehub.ph.\n\nThank you for your patience!`
+              : `Hello! We sincerely apologize for the delayed response. 🙏\n\nYour message is important to us. A team member will personally reach out to you very soon.\n\nFor immediate assistance, please call us at +639176851216 or email marketing@innovatehub.ph.\n\nThank you for your patience!`;
+            
+            await callSendApiWithTag(token, psid, { text: apologyMessage }, 'CONFIRMED_EVENT_UPDATE');
+            console.log(`[SLA] Sent apology to ${psid}`);
+          } catch (msgErr) {
+            console.error('[SLA] Apology message error:', msgErr.message);
+          }
+        }
+
+        // Send escalation email to admin
+        const contactName = `${firstName} ${contact.get('lastName') || ''}`.trim() || 'Unknown';
+        await sendEmail({
+          to: 'admin@innovatehub.ph',
+          template: 'custom',
+          data: {
+            name: 'Admin',
+            content: `
+              <div class="note" style="background-color:#f8d7da;border-left-color:#dc3545;">
+                <p><strong>🚨 ESCALATION: Conversation Pending 24+ Hours</strong></p>
+              </div>
+              <div class="highlight-box">
+                <div class="service-item"><strong>Contact:</strong> ${contactName}</div>
+                <div class="service-item"><strong>PSID:</strong> ${psid || 'N/A'}</div>
+                <div class="service-item"><strong>Email:</strong> ${contact.get('email') || 'N/A'}</div>
+                <div class="service-item"><strong>Phone:</strong> ${contact.get('phone') || 'N/A'}</div>
+                <div class="service-item"><strong>Last Message:</strong> ${conv.get('lastMessageAt').toLocaleString('en-PH')}</div>
+              </div>
+              <p style="color:#dc3545;font-weight:bold;">An automatic apology has been sent to the customer. Please follow up immediately.</p>
+              <div style="text-align:center;margin:30px 0;">
+                <a href="https://dashboard.innoserver.cloud/conversations/${conv.id}" class="button" style="background-color:#dc3545;">Respond Now</a>
+              </div>
+            `
+          },
+          subject: `🚨 ESCALATION: ${contactName} waiting 24+ hours — apology sent`
+        });
+
+        conv.set('slaEscalated', true);
+        conv.set('slaEscalatedAt', new Date());
+        await conv.save(null, { useMasterKey: true });
+        escalations++;
+      } catch (err) {
+        errors++;
+        console.error('[SLA] Escalation error:', err.message);
+      }
+    }
+
+    console.log(`[SLA] Done: alerts=${alerts}, escalations=${escalations}, errors=${errors}`);
+    return { alerts, escalations, errors };
+  } catch (err) {
+    console.error('[SLA] Check error:', err.message);
+    return { error: err.message };
+  }
+}
+
+// Manual trigger endpoint
+app.post('/api/check-sla', async (req, res) => {
+  const result = await checkConversationSLA();
+  res.json(result);
+});
+
+// Get SLA report
+app.get('/api/sla-report', async (req, res) => {
+  try {
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Current pending conversations
+    const pendingQuery = new Parse.Query('Conversation');
+    pendingQuery.equalTo('status', 'pending');
+    const pendingCount = await pendingQuery.count({ useMasterKey: true });
+
+    // Conversations responded within 5 hours (last 7 days)
+    const respondedQuery = new Parse.Query('Conversation');
+    respondedQuery.greaterThan('lastRespondedAt', sevenDaysAgo);
+    respondedQuery.exists('lastRespondedAt');
+    const respondedConvs = await respondedQuery.find({ useMasterKey: true });
+
+    let withinSLA = 0, outsideSLA = 0;
+    respondedConvs.forEach(conv => {
+      const created = conv.get('createdAt');
+      const responded = conv.get('lastRespondedAt');
+      if (responded && created) {
+        const responseTimeHours = (responded - created) / (60 * 60 * 1000);
+        if (responseTimeHours <= 5) withinSLA++;
+        else outsideSLA++;
+      }
+    });
+
+    const slaCompliance = respondedConvs.length > 0 
+      ? Math.round((withinSLA / respondedConvs.length) * 100) 
+      : 100;
+
+    // Escalated in last 24 hours
+    const escalatedQuery = new Parse.Query('Conversation');
+    escalatedQuery.equalTo('slaEscalated', true);
+    escalatedQuery.greaterThan('slaEscalatedAt', oneDayAgo);
+    const escalatedCount = await escalatedQuery.count({ useMasterKey: true });
+
+    res.json({
+      pendingConversations: pendingCount,
+      slaCompliance: `${slaCompliance}%`,
+      withinSLA,
+      outsideSLA,
+      escalatedLast24h: escalatedCount,
+      period: '7 days'
+    });
+  } catch (err) {
+    console.error('[API] sla-report error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =============================================================================
+// TIER 3 #11: Duplicate Contact Merging
+// =============================================================================
+
+function normalizePhoneNumber(phone) {
+  if (!phone) return null;
+  // Remove all non-digits
+  let digits = phone.replace(/\D/g, '');
+  // Convert to +63 format
+  if (digits.startsWith('0')) {
+    digits = '63' + digits.slice(1);
+  } else if (digits.startsWith('9') && digits.length === 10) {
+    digits = '63' + digits;
+  } else if (!digits.startsWith('63') && digits.length === 10) {
+    digits = '63' + digits;
+  }
+  return digits.length >= 10 ? '+' + digits : null;
+}
+
+async function findDuplicateContacts(businessId) {
+  try {
+    const business = await getBusinessById(businessId);
+    
+    // Get all contacts for this business
+    const contactQuery = new Parse.Query('MessengerContact');
+    contactQuery.equalTo('business', business);
+    contactQuery.limit(10000);
+    const contacts = await contactQuery.find({ useMasterKey: true });
+
+    const duplicates = [];
+    const phoneMap = new Map();
+    const emailMap = new Map();
+
+    for (const contact of contacts) {
+      const phone = normalizePhoneNumber(contact.get('phone'));
+      const email = contact.get('email')?.toLowerCase().trim();
+      
+      // Check phone duplicates
+      if (phone) {
+        if (phoneMap.has(phone)) {
+          const existing = phoneMap.get(phone);
+          duplicates.push({
+            type: 'phone',
+            value: phone,
+            contacts: [existing.id, contact.id]
+          });
+        } else {
+          phoneMap.set(phone, contact);
+        }
+      }
+      
+      // Check email duplicates
+      if (email) {
+        if (emailMap.has(email)) {
+          const existing = emailMap.get(email);
+          // Only add if not already in duplicates from phone match
+          const alreadyLinked = duplicates.some(d => 
+            d.contacts.includes(existing.id) && d.contacts.includes(contact.id)
+          );
+          if (!alreadyLinked) {
+            duplicates.push({
+              type: 'email',
+              value: email,
+              contacts: [existing.id, contact.id]
+            });
+          }
+        } else {
+          emailMap.set(email, contact);
+        }
+      }
+    }
+
+    return { totalContacts: contacts.length, duplicates, duplicateCount: duplicates.length };
+  } catch (err) {
+    console.error('[Duplicate] Find error:', err.message);
+    return { error: err.message };
+  }
+}
+
+async function mergeContacts(primaryContactId, secondaryContactId) {
+  try {
+    const primary = await new Parse.Query('MessengerContact').get(primaryContactId, { useMasterKey: true });
+    const secondary = await new Parse.Query('MessengerContact').get(secondaryContactId, { useMasterKey: true });
+
+    // Merge fields - prefer non-empty values from primary, fill gaps from secondary
+    const fieldsToMerge = ['firstName', 'lastName', 'email', 'phone', 'profilePic', 'locale', 'referralSource'];
+    fieldsToMerge.forEach(field => {
+      if (!primary.get(field) && secondary.get(field)) {
+        primary.set(field, secondary.get(field));
+      }
+    });
+
+    // Normalize phone on primary
+    const normalizedPhone = normalizePhoneNumber(primary.get('phone'));
+    if (normalizedPhone) {
+      primary.set('phone', normalizedPhone);
+    }
+
+    // Keep most recent interaction
+    const primaryLastInteraction = primary.get('lastInteractionAt') || new Date(0);
+    const secondaryLastInteraction = secondary.get('lastInteractionAt') || new Date(0);
+    if (secondaryLastInteraction > primaryLastInteraction) {
+      primary.set('lastInteractionAt', secondaryLastInteraction);
+    }
+
+    // Move conversations from secondary to primary
+    const convQuery = new Parse.Query('Conversation');
+    convQuery.equalTo('contact', secondary);
+    const conversations = await convQuery.find({ useMasterKey: true });
+    for (const conv of conversations) {
+      conv.set('contact', primary);
+      await conv.save(null, { useMasterKey: true });
+    }
+
+    // Move messages from secondary to primary
+    const msgQuery = new Parse.Query('Message');
+    msgQuery.equalTo('senderPsid', secondary.get('psid'));
+    const messages = await msgQuery.find({ useMasterKey: true });
+    // Messages don't need to be moved - they're linked via conversation
+
+    // Move nurture enrollments
+    const enrollQuery = new Parse.Query('NurtureEnrollment');
+    enrollQuery.equalTo('contact', secondary);
+    const enrollments = await enrollQuery.find({ useMasterKey: true });
+    for (const enrollment of enrollments) {
+      // Check if primary already has this sequence
+      const existCheck = new Parse.Query('NurtureEnrollment');
+      existCheck.equalTo('contact', primary);
+      existCheck.equalTo('sequence', enrollment.get('sequence'));
+      const exists = await existCheck.first({ useMasterKey: true });
+      
+      if (exists) {
+        // Cancel duplicate enrollment
+        enrollment.set('status', 'cancelled');
+        enrollment.set('mergedIntoPrimary', primary.id);
+      } else {
+        enrollment.set('contact', primary);
+      }
+      await enrollment.save(null, { useMasterKey: true });
+    }
+
+    // Move FbLeads
+    const leadQuery = new Parse.Query('FbLead');
+    leadQuery.equalTo('contact', secondary);
+    const leads = await leadQuery.find({ useMasterKey: true });
+    for (const lead of leads) {
+      lead.set('contact', primary);
+      await lead.save(null, { useMasterKey: true });
+    }
+
+    // Mark secondary as merged and save primary
+    primary.set('mergedFrom', [...(primary.get('mergedFrom') || []), secondary.id]);
+    await primary.save(null, { useMasterKey: true });
+
+    // Delete or mark secondary as merged
+    secondary.set('mergedIntoPrimary', primary.id);
+    secondary.set('status', 'merged');
+    await secondary.save(null, { useMasterKey: true });
+
+    console.log(`[Duplicate] Merged contact ${secondaryContactId} into ${primaryContactId}`);
+    
+    return {
+      success: true,
+      primary: primaryContactId,
+      secondary: secondaryContactId,
+      conversationsMoved: conversations.length,
+      enrollmentsMoved: enrollments.length,
+      leadsMoved: leads.length
+    };
+  } catch (err) {
+    console.error('[Duplicate] Merge error:', err.message);
+    return { error: err.message };
+  }
+}
+
+// API Endpoints for duplicate management
+app.get('/api/duplicates/:businessId', async (req, res) => {
+  const result = await findDuplicateContacts(req.params.businessId);
+  res.json(result);
+});
+
+app.post('/api/merge-contacts', async (req, res) => {
+  const { primaryContactId, secondaryContactId } = req.body;
+  if (!primaryContactId || !secondaryContactId) {
+    return res.status(400).json({ error: 'primaryContactId and secondaryContactId required' });
+  }
+  const result = await mergeContacts(primaryContactId, secondaryContactId);
+  res.json(result);
+});
+
+// Auto-merge all duplicates for a business
+app.post('/api/auto-merge-duplicates/:businessId', async (req, res) => {
+  try {
+    const { businessId } = req.params;
+    const duplicates = await findDuplicateContacts(businessId);
+    
+    if (duplicates.error) {
+      return res.status(500).json(duplicates);
+    }
+
+    const results = { merged: 0, errors: 0 };
+    
+    for (const dup of duplicates.duplicates) {
+      const [primaryId, secondaryId] = dup.contacts;
+      const mergeResult = await mergeContacts(primaryId, secondaryId);
+      if (mergeResult.success) {
+        results.merged++;
+      } else {
+        results.errors++;
+      }
+    }
+
+    res.json({
+      ...results,
+      duplicatesFound: duplicates.duplicateCount
+    });
+  } catch (err) {
+    console.error('[API] auto-merge error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =============================================================================
+// TIER 3 #12: Bot Flow A/B Testing
+// =============================================================================
+
+async function selectABTestVariant(flow, stepIndex) {
+  const steps = flow.get('steps') || [];
+  const step = steps[stepIndex];
+  
+  if (!step || !step.variants || step.variants.length === 0) {
+    return { variant: step, variantId: null };
+  }
+
+  // Get or create A/B test record
+  let abTest = null;
+  const abQuery = new Parse.Query('BotFlowABTest');
+  abQuery.equalTo('flowId', flow.id);
+  abQuery.equalTo('stepIndex', stepIndex);
+  abTest = await abQuery.first({ useMasterKey: true });
+
+  if (!abTest) {
+    abTest = new Parse.Object('BotFlowABTest');
+    abTest.set('flowId', flow.id);
+    abTest.set('stepIndex', stepIndex);
+    abTest.set('variants', step.variants.map((v, i) => ({
+      id: `v${i}`,
+      content: v.content || step.content,
+      impressions: 0,
+      conversions: 0
+    })));
+    await abTest.save(null, { useMasterKey: true });
+  }
+
+  const variants = abTest.get('variants') || [];
+  
+  // Random selection (could be upgraded to multi-armed bandit)
+  const selectedIndex = Math.floor(Math.random() * variants.length);
+  const selectedVariant = variants[selectedIndex];
+
+  // Increment impressions
+  variants[selectedIndex].impressions = (variants[selectedIndex].impressions || 0) + 1;
+  abTest.set('variants', variants);
+  await abTest.save(null, { useMasterKey: true });
+
+  // Return variant with content merged from original step
+  const mergedVariant = { ...step, ...selectedVariant };
+  return { variant: mergedVariant, variantId: selectedVariant.id, testId: abTest.id };
+}
+
+async function trackABTestConversion(testId, variantId) {
+  try {
+    const abTest = await new Parse.Query('BotFlowABTest').get(testId, { useMasterKey: true });
+    const variants = abTest.get('variants') || [];
+    
+    const variantIndex = variants.findIndex(v => v.id === variantId);
+    if (variantIndex >= 0) {
+      variants[variantIndex].conversions = (variants[variantIndex].conversions || 0) + 1;
+      abTest.set('variants', variants);
+      await abTest.save(null, { useMasterKey: true });
+      console.log(`[A/B] Tracked conversion for ${testId}:${variantId}`);
+    }
+  } catch (err) {
+    console.error('[A/B] Conversion tracking error:', err.message);
+  }
+}
+
+// API Endpoints for A/B testing
+app.get('/api/ab-tests', async (req, res) => {
+  try {
+    const query = new Parse.Query('BotFlowABTest');
+    query.limit(100);
+    const tests = await query.find({ useMasterKey: true });
+
+    const results = tests.map(t => {
+      const variants = t.get('variants') || [];
+      return {
+        id: t.id,
+        flowId: t.get('flowId'),
+        stepIndex: t.get('stepIndex'),
+        variants: variants.map(v => ({
+          id: v.id,
+          impressions: v.impressions || 0,
+          conversions: v.conversions || 0,
+          conversionRate: v.impressions > 0 
+            ? `${((v.conversions || 0) / v.impressions * 100).toFixed(1)}%` 
+            : '0%',
+          preview: v.content?.substring(0, 50) + '...'
+        })),
+        winner: variants.reduce((best, v) => {
+          const rate = v.impressions > 0 ? (v.conversions || 0) / v.impressions : 0;
+          const bestRate = best.impressions > 0 ? (best.conversions || 0) / best.impressions : 0;
+          return rate > bestRate ? v : best;
+        }, variants[0])?.id
+      };
+    });
+
+    res.json({ tests: results, count: results.length });
+  } catch (err) {
+    console.error('[API] ab-tests error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/ab-tests/:testId/convert', async (req, res) => {
+  const { variantId } = req.body;
+  if (!variantId) {
+    return res.status(400).json({ error: 'variantId required' });
+  }
+  await trackABTestConversion(req.params.testId, variantId);
+  res.json({ success: true });
+});
+
+// Create/update A/B test variants for a flow step
+app.post('/api/flows/:flowId/ab-test', async (req, res) => {
+  try {
+    const { stepIndex, variants } = req.body;
+    if (stepIndex === undefined || !variants || !Array.isArray(variants)) {
+      return res.status(400).json({ error: 'stepIndex and variants array required' });
+    }
+
+    const flow = await new Parse.Query('BotFlow').get(req.params.flowId, { useMasterKey: true });
+    const steps = flow.get('steps') || [];
+    
+    if (stepIndex >= steps.length) {
+      return res.status(400).json({ error: 'Invalid stepIndex' });
+    }
+
+    // Update step with variants
+    steps[stepIndex].variants = variants.map((v, i) => ({
+      id: `v${i}`,
+      content: v.content,
+      ...v
+    }));
+    flow.set('steps', steps);
+    await flow.save(null, { useMasterKey: true });
+
+    // Create or update A/B test record
+    let abTest;
+    const abQuery = new Parse.Query('BotFlowABTest');
+    abQuery.equalTo('flowId', flow.id);
+    abQuery.equalTo('stepIndex', stepIndex);
+    abTest = await abQuery.first({ useMasterKey: true });
+
+    if (!abTest) {
+      abTest = new Parse.Object('BotFlowABTest');
+      abTest.set('flowId', flow.id);
+      abTest.set('stepIndex', stepIndex);
+    }
+
+    abTest.set('variants', steps[stepIndex].variants.map(v => ({
+      id: v.id,
+      content: v.content,
+      impressions: 0,
+      conversions: 0
+    })));
+    await abTest.save(null, { useMasterKey: true });
+
+    res.json({ success: true, flowId: flow.id, stepIndex, variantsCreated: variants.length });
+  } catch (err) {
+    console.error('[API] create ab-test error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =============================================================================
+// TIER 3 #13: Post-Onboarding Nurture
+// =============================================================================
+
+async function enrollInPostOnboardingNurture(lead, business) {
+  try {
+    const contact = lead.get('contact');
+    if (!contact) return;
+
+    let contactObj = contact;
+    if (typeof contact.fetch === 'function') {
+      try { contactObj = await contact.fetch({ useMasterKey: true }); } catch (_) {}
+    }
+
+    const email = contactObj.get('email');
+    const psid = contactObj.get('psid');
+    const firstName = contactObj.get('firstName') || '';
+
+    if (!email && !psid) return;
+
+    const now = Date.now();
+    const onboardingDrip = [
+      { 
+        day: 1, 
+        template: 'custom', 
+        subject: '🚀 Getting Started: Your First Day as a PlataPay Agent',
+        channel: 'both',
+        content: `
+          <p>Congratulations on your first day as a PlataPay agent, ${firstName || 'partner'}! 🎉</p>
+          <div class="highlight-box">
+            <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📚 Quick Start Checklist</h3>
+            <div class="service-item">1️⃣ Log in to your Agent Panel at platapay.ph</div>
+            <div class="service-item">2️⃣ Complete your profile setup</div>
+            <div class="service-item">3️⃣ Watch the 3-minute training video</div>
+            <div class="service-item">4️⃣ Process your first test transaction</div>
+            <div class="service-item">5️⃣ Invite your first customer!</div>
+          </div>
+          <div class="note">
+            <p><strong>Pro Tip:</strong> Start with e-loading — it's the easiest service and most in-demand!</p>
+          </div>
+          <div style="text-align:center;margin:30px 0;">
+            <a href="https://platapay.ph/training" class="button">Watch Training Videos</a>
+          </div>
+        `,
+        messengerText: `🚀 Day 1 Tips!\n\n1️⃣ Log in to Agent Panel\n2️⃣ Complete your profile\n3️⃣ Watch 3-min training\n4️⃣ Process test transaction\n5️⃣ Invite first customer!\n\nPro tip: Start with e-loading — easiest & most popular!`
+      },
+      { 
+        day: 7, 
+        template: 'custom', 
+        subject: '📊 Week 1 Check-in: How Are You Doing?',
+        channel: 'both',
+        content: `
+          <p>Hi ${firstName || 'there'}! It's been one week since you joined PlataPay. How's it going? 🙌</p>
+          <div class="highlight-box">
+            <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">💬 Quick Questions</h3>
+            <div class="service-item">✅ Have you processed your first transactions?</div>
+            <div class="service-item">✅ Any questions about the panel or services?</div>
+            <div class="service-item">✅ Need help with marketing your new business?</div>
+          </div>
+          <p>We're here to help you succeed! Reply to this email or message us on Messenger if you need assistance.</p>
+          <div class="note">
+            <p><strong>Common Week 1 Questions:</strong></p>
+            <ul>
+              <li>How do I top up my wallet? — Use GCash, bank transfer, or visit a partner outlet</li>
+              <li>How do I get customers? — Start with family, friends, neighbors!</li>
+              <li>When do I get commissions? — Instantly after each transaction</li>
+            </ul>
+          </div>
+          <div style="text-align:center;margin:30px 0;">
+            <a href="https://m.me/PlataPay?ref=SUPPORT" class="button">Get Help Now</a>
+          </div>
+        `,
+        messengerText: `📊 Week 1 Check-in!\n\nHow are things going? Quick questions:\n\n✅ Processed first transactions?\n✅ Any questions about the panel?\n✅ Need marketing help?\n\nReply here or call +639176851216 for support!`
+      },
+      { 
+        day: 30, 
+        template: 'custom', 
+        subject: '🏆 30-Day Review: Celebrate Your Progress!',
+        channel: 'both',
+        content: `
+          <p>Congratulations, ${firstName || 'Agent'}! 🎉 You've been a PlataPay agent for 30 days!</p>
+          <div class="highlight-box">
+            <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">🏆 Time for a Review</h3>
+            <p>Let's check your progress and see how we can help you grow even more:</p>
+            <div class="service-item">📊 <strong>Transactions:</strong> How many have you processed?</div>
+            <div class="service-item">💰 <strong>Earnings:</strong> Are you hitting your targets?</div>
+            <div class="service-item">📈 <strong>Growth:</strong> Any services you haven't tried yet?</div>
+          </div>
+          <p>Top agents at the 30-day mark are usually doing 50+ transactions/week. Where are you?</p>
+          <div class="note">
+            <p><strong>Level Up:</strong> Have you tried these high-commission services?</p>
+            <ul>
+              <li>J&T Parcel Services — 20% commission per parcel</li>
+              <li>Travel Bookings — ₱100-500 per booking</li>
+              <li>Insurance Products — Recurring commissions</li>
+            </ul>
+          </div>
+          <div style="text-align:center;margin:30px 0;">
+            <a href="tel:+639176851216" class="button">📞 Schedule a Review Call</a>
+          </div>
+        `,
+        messengerText: `🏆 30-Day Review!\n\nCongratulations on 1 month as a PlataPay Agent! 🎉\n\nLet's review your progress:\n📊 Transactions processed?\n💰 Hitting earnings targets?\n📈 Tried all services?\n\nTop agents do 50+ transactions/week. How are you doing?\n\nReply "REVIEW" to schedule a call!`
+      }
+    ];
+
+    // Schedule post-onboarding emails
+    for (const step of onboardingDrip) {
+      const sendAt = new Date(now + step.day * 24 * 60 * 60 * 1000);
+
+      // Schedule email
+      if (email && !contactObj.get('emailUnsubscribed')) {
+        const scheduledEmail = new Parse.Object('ScheduledAction');
+        scheduledEmail.set('actionType', 'email');
+        scheduledEmail.set('status', 'pending');
+        scheduledEmail.set('scheduledFor', sendAt);
+        scheduledEmail.set('payload', {
+          to: email,
+          template: step.template,
+          data: { name: firstName, content: step.content },
+          subject: step.subject
+        });
+        scheduledEmail.set('contactId', contactObj.id);
+        scheduledEmail.set('leadId', lead.id);
+        scheduledEmail.set('dripType', 'post_onboarding');
+        scheduledEmail.set('dripDay', step.day);
+        await scheduledEmail.save(null, { useMasterKey: true });
+      }
+
+      // Schedule Messenger message
+      if (psid && step.messengerText) {
+        const scheduledMsg = new Parse.Object('ScheduledAction');
+        scheduledMsg.set('actionType', 'messenger');
+        scheduledMsg.set('status', 'pending');
+        scheduledMsg.set('scheduledFor', sendAt);
+        scheduledMsg.set('payload', {
+          psid: psid,
+          businessId: business.id,
+          message: step.messengerText
+        });
+        scheduledMsg.set('contactId', contactObj.id);
+        scheduledMsg.set('leadId', lead.id);
+        scheduledMsg.set('dripType', 'post_onboarding');
+        scheduledMsg.set('dripDay', step.day);
+        await scheduledMsg.save(null, { useMasterKey: true });
+      }
+    }
+
+    console.log(`[Onboarding] Enrolled lead ${lead.id} in post-onboarding nurture (${email || psid})`);
+  } catch (err) {
+    console.error('[Onboarding] Enrollment error:', err.message);
+  }
+}
+
+// Update processScheduledActions to handle messenger type
+const originalProcessScheduledActions = processScheduledActions;
+async function processScheduledActionsExtended() {
+  const now = new Date();
+  
+  try {
+    const query = new Parse.Query('ScheduledAction');
+    query.equalTo('status', 'pending');
+    query.lessThanOrEqualTo('scheduledFor', now);
+    query.limit(50);
+    const dueActions = await query.find({ useMasterKey: true });
+
+    let processed = 0, errors = 0;
+
+    for (const action of dueActions) {
+      try {
+        const actionType = action.get('actionType');
+        const payload = action.get('payload');
+
+        if (actionType === 'email') {
+          await sendEmail({
+            to: payload.to,
+            template: payload.template,
+            data: payload.data || {},
+            subject: payload.subject
+          });
+          console.log(`[Scheduled] Processed scheduled email to ${payload.to}`);
+        } else if (actionType === 'messenger') {
+          // Handle Messenger scheduled messages
+          const business = await getBusinessById(payload.businessId);
+          const token = await getPageAccessToken(business);
+          await callSendApiWithTag(token, payload.psid, { text: payload.message }, 'CONFIRMED_EVENT_UPDATE');
+          console.log(`[Scheduled] Processed scheduled Messenger to ${payload.psid}`);
+        }
+
+        action.set('status', 'completed');
+        action.set('processedAt', new Date());
+        await action.save(null, { useMasterKey: true });
+        processed++;
+      } catch (err) {
+        action.set('status', 'failed');
+        action.set('error', err.message);
+        await action.save(null, { useMasterKey: true });
+        errors++;
+        console.error(`[Scheduled] Failed action ${action.id}:`, err.message);
+      }
+    }
+
+    if (dueActions.length > 0) {
+      console.log(`[Scheduled] Processed ${processed} actions, ${errors} errors`);
+    }
+  } catch (err) {
+    console.error('[Scheduled] Process error:', err.message);
+  }
+}
+
+// Manual endpoint to trigger post-onboarding for a lead
+app.post('/api/enroll-post-onboarding/:leadId', async (req, res) => {
+  try {
+    const lead = await new Parse.Query('FbLead').get(req.params.leadId, { useMasterKey: true });
+    const business = lead.get('business');
+    let businessObj = business;
+    if (typeof business.fetch === 'function') {
+      try { businessObj = await business.fetch({ useMasterKey: true }); } catch (_) {}
+    }
+    
+    await enrollInPostOnboardingNurture(lead, businessObj);
+    res.json({ success: true, leadId: req.params.leadId });
+  } catch (err) {
+    console.error('[API] enroll-post-onboarding error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =============================================================================
 // TIER 1 #2: Pipeline Stage API Endpoint
 // =============================================================================
 
@@ -2753,8 +3613,14 @@ app.post('/api/update-pipeline-stage', async (req, res) => {
     // Auto-send stage email
     await sendPipelineStageEmail(lead, businessObj, newStage);
 
+    // TIER 3 #13: Auto-enroll in post-onboarding nurture when onboarded
+    if (newStage === 'onboarded') {
+      await enrollInPostOnboardingNurture(lead, businessObj);
+      console.log(`[Pipeline] Enrolled lead ${leadId} in post-onboarding nurture`);
+    }
+
     console.log(`[Pipeline] Lead ${leadId} moved from ${oldStage || 'none'} to ${newStage}`);
-    res.json({ success: true, leadId, oldStage, newStage });
+    res.json({ success: true, leadId, oldStage, newStage, postOnboardingEnrolled: newStage === 'onboarded' });
   } catch (err) {
     console.error('[API] update-pipeline-stage error:', err.message);
     res.status(500).json({ error: err.message });
@@ -3072,6 +3938,7 @@ app.listen(PORT, () => {
   console.log(`[Server] Scheduled actions processor runs every 1 minute`);
   console.log(`[Server] Daily digest runs at 8 AM Manila time (0:00 UTC)`);
   console.log(`[Server] Re-engagement check runs daily at 10 AM Manila time (2:00 UTC)`);
+  console.log(`[Server] SLA check runs every 30 minutes`);
 
   // Run nurture processor on interval (every hour)
   setInterval(() => {
@@ -3080,12 +3947,19 @@ app.listen(PORT, () => {
     });
   }, NURTURE_INTERVAL_MS);
 
-  // Run scheduled actions processor every minute
+  // Run scheduled actions processor every minute (extended to support Messenger)
   setInterval(() => {
-    processScheduledActions().catch(err => {
+    processScheduledActionsExtended().catch(err => {
       console.error('[Scheduled] Interval error:', err.message);
     });
   }, 60 * 1000); // Every 1 minute
+
+  // TIER 3 #10: Run SLA check every 30 minutes
+  setInterval(() => {
+    checkConversationSLA().catch(err => {
+      console.error('[SLA] Interval error:', err.message);
+    });
+  }, 30 * 60 * 1000); // Every 30 minutes
 
   // Daily digest at 8 AM Manila time (UTC+8 = 0:00 UTC)
   const scheduleDailyDigest = () => {
@@ -3135,4 +4009,11 @@ app.listen(PORT, () => {
       console.error('[Nurture] Startup run error:', err.message);
     });
   }, 10000);
+
+  // Run SLA check once on startup after 20 seconds
+  setTimeout(() => {
+    checkConversationSLA().catch(err => {
+      console.error('[SLA] Startup run error:', err.message);
+    });
+  }, 20000);
 });
