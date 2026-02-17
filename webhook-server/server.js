@@ -58,11 +58,15 @@ function emailBaseTemplate({ title, preheader, bodyContent }) {
     .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; }
     .header { background-color: ${PLATAPAY_BRAND_COLOR}; color: #ffffff; text-align: center; padding: 30px 20px; }
     .header img { width: 150px; height: auto; }
-    .header h1 { font-size: 22px; margin: 15px 0 0; }
+    .header h1 { margin: 15px 0 0; font-size: 24px; }
     .content { padding: 30px 30px 20px; font-size: 16px; line-height: 1.6; }
-    .button { display: inline-block; background-color: ${PLATAPAY_CTA_COLOR}; color: #ffffff; padding: 14px 28px; text-align: center; text-decoration: none; border-radius: 6px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+    .button-wrapper { text-align: center; margin: 30px 0; }
+    .button { display: inline-block; background-color: ${PLATAPAY_CTA_COLOR}; color: #ffffff; padding: 16px 48px; text-align: center; text-decoration: none; border-radius: 24px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+    .button:hover { background-color: #218838; }
     .button-purple { background-color: ${PLATAPAY_BRAND_COLOR}; }
-    .note { background-color: #f3e5f5; padding: 15px 20px; border-left: 4px solid ${PLATAPAY_BRAND_COLOR}; margin-top: 20px; border-radius: 0 8px 8px 0; }
+    .button-purple:hover { background-color: #452566; }
+    .note { background-color: #f3e5f5; padding: 15px 20px; border-left: 4px solid ${PLATAPAY_BRAND_COLOR}; margin-top: 30px; border-radius: 0 4px 4px 0; }
+    .note p { margin: 0; }
     .highlight-box { background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; }
     .service-item { padding: 8px 0; border-bottom: 1px solid #eee; }
     .service-item:last-child { border-bottom: none; }
@@ -70,17 +74,16 @@ function emailBaseTemplate({ title, preheader, bodyContent }) {
     .stat { flex: 1; padding: 15px; }
     .stat-num { font-size: 28px; font-weight: 700; color: ${PLATAPAY_BRAND_COLOR}; }
     .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
-    .footer { background-color: ${PLATAPAY_BRAND_COLOR}; color: #ffffff; text-align: center; font-size: 12px; padding: 25px 20px; }
+    .footer { background-color: ${PLATAPAY_BRAND_COLOR}; color: #ffffff; text-align: center; font-size: 12px; padding: 20px; }
+    .footer img { width: 80px; height: auto; margin-bottom: 10px; }
+    .footer p { margin: 5px 0; }
     .footer a { color: #e0c8f0; text-decoration: underline; }
-    .social-links { margin: 10px 0; }
-    .social-links a { color: #ffffff; text-decoration: none; margin: 0 8px; font-size: 14px; }
     .divider { height: 1px; background: #eee; margin: 20px 0; }
     .preheader { display: none; max-height: 0; overflow: hidden; }
     @media only screen and (max-width: 480px) {
-      .container { margin: 10px; border-radius: 10px; }
+      .container { margin: 10px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.12); }
       .content { padding: 20px 15px; }
-      .button { width: 100%; display: block; text-align: center; }
-      .stats-row { flex-direction: column; }
+      .button { display: block; padding: 16px 20px; }
     }
   </style>
 </head>
@@ -95,15 +98,10 @@ function emailBaseTemplate({ title, preheader, bodyContent }) {
       ${bodyContent}
     </div>
     <div class="footer">
-      <div style="font-size:18px;font-weight:bold;margin-bottom:15px;letter-spacing:1px;">INNOVATEHUB</div>
-      <div class="social-links">
-        <a href="https://facebook.com/PlataPay">Facebook</a> &bull;
-        <a href="https://platapay.ph">Website</a> &bull;
-        <a href="mailto:marketing@innovatehub.ph">Email</a>
-      </div>
-      <p>PlataPay by InnovateHub Inc.<br>#13 InnovateHub Commercial Building, San Antonio, San Pascual, Batangas City 4204</p>
-      <p>Phone: +639176851216 | Email: marketing@innovatehub.ph</p>
-      <p>&copy; ${new Date().getFullYear()} InnovateHub Philippines. All rights reserved.</p>
+      <img src="${PLATAPAY_LOGO_URL}" alt="InnovateHub Logo" />
+      <p>Powered by:<br><strong>InnovateHub Inc Philippines</strong></p>
+      <p>This is an automated message. Please do not reply directly to this email.</p>
+      <p>&copy; ${new Date().getFullYear()} InnovateHub. All rights reserved.</p>
       <p style="margin-top:10px;font-size:11px;color:#c8b0d8;">
         <a href="https://webhook.innoserver.cloud/email/unsubscribe?email={{email}}" style="color:#c8b0d8;">Unsubscribe</a> |
         <a href="https://webhook.innoserver.cloud/privacy-policy" style="color:#c8b0d8;">Privacy Policy</a>
@@ -124,8 +122,8 @@ const EMAIL_TEMPLATES = {
     bodyContent: `
       <p>Hello ${data.name || data.email},</p>
       <p>Thank you for starting your registration as a PlataPay agent. To continue with your application, please confirm your email address by clicking the button below:</p>
-      <div style="text-align:center;margin:30px 0;">
-        <a href="${data.confirmationUrl || 'https://platapay.ph/get-started'}" class="button">Confirm Email &amp; Continue Registration</a>
+      <div class="button-wrapper">
+        <a href="${data.confirmationUrl || 'https://platapay.ph/get-started'}" class="button">Confirm Email</a>
       </div>
       <p>After confirming your email, you'll be able to set up your password and complete your agent profile.</p>
       <div class="note">
@@ -148,7 +146,7 @@ const EMAIL_TEMPLATES = {
         <div class="service-item">80,000+ strong agent network</div>
         <div class="service-item">BSP-compliant and secure platform</div>
       </div>
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="https://platapay.ph/franchise" class="button">Explore Business Packages</a>
       </div>
       <p>A PlataPay representative will be in touch with you shortly. In the meantime, feel free to explore our website or message us on <a href="https://m.me/PlataPay">Facebook Messenger</a>.</p>
@@ -172,7 +170,7 @@ const EMAIL_TEMPLATES = {
         <div class="service-item"><strong>Gov't Payments</strong> — SSS, PhilHealth, Pag-IBIG, NBI, LTO</div>
         <div class="service-item"><strong>Travel & More</strong> — Airline tickets, tours, insurance</div>
       </div>
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="https://platapay.ph/agents" class="button">Find a PlataPay Agent Near You</a>
       </div>
       <p>Download our mobile app for even more convenience.</p>`
@@ -195,7 +193,7 @@ const EMAIL_TEMPLATES = {
         <p style="margin:5px 0;">Lifetime Contract | Complete package | Premium support</p>
         <p style="margin:5px 0;font-size:14px;color:#666;">Best value for serious entrepreneurs</p>
       </div>
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="https://platapay.ph/franchise" class="button">View Full Package Details</a>
       </div>
       <p>To schedule a business orientation, call or Viber us at <strong>+639176851216</strong>.</p>
@@ -221,7 +219,7 @@ const EMAIL_TEMPLATES = {
         <div class="service-item"><strong>Scratch IT:</strong> ₱100-300 per pack sold</div>
       </div>
       <p style="font-size:14px;color:#666;">*Earnings are estimates and depend on location, effort, and transaction volume.</p>
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="https://m.me/PlataPay" class="button">Chat With Us to Learn More</a>
       </div>`
   }),
@@ -246,7 +244,7 @@ const EMAIL_TEMPLATES = {
         <p style="font-size:14px;color:#666;">— Juan dela Cruz, PlataPay Agent</p>
       </div>
       <p>We now have <strong>80,000+ agents</strong> in locations like Santa Rosa (Laguna), Pasay City, Anahawan (Southern Leyte), Cabagan (Isabela), Sta. Ana (Manila), and many more!</p>
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="https://platapay.ph/franchise" class="button">Start Your PlataPay Business</a>
       </div>`
   }),
@@ -266,10 +264,10 @@ const EMAIL_TEMPLATES = {
         <div class="service-item">Packages starting at ₱449,000</div>
         <div class="service-item">ROI as fast as 3 months</div>
       </div>
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="tel:+639176851216" class="button" style="margin-bottom:10px;">📞 Call Now: +639176851216</a>
       </div>
-      <div style="text-align:center;margin:10px 0;">
+      <div class="button-wrapper">
         <a href="https://m.me/PlataPay" class="button button-purple">💬 Message Us on Messenger</a>
       </div>
       <p style="text-align:center;margin-top:20px;font-size:14px;color:#666;">Or email us at <a href="mailto:marketing@innovatehub.ph">marketing@innovatehub.ph</a></p>
@@ -295,7 +293,7 @@ const EMAIL_TEMPLATES = {
         <div class="service-item">J&T Parcel Services</div>
         <div class="service-item">And much more!</div>
       </div>
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="https://platapay.ph/agents" class="button">Find All PlataPay Locations</a>
       </div>`
   }),
@@ -308,7 +306,7 @@ const EMAIL_TEMPLATES = {
       <p>Hi ${data.name || 'there'}!</p>
       ${data.content || '<p>Stay tuned for exciting updates from PlataPay!</p>'}
       <div class="divider"></div>
-      <div style="text-align:center;margin:20px 0;">
+      <div class="button-wrapper">
         <a href="https://platapay.ph/news-and-events" class="button">Read More on Our Website</a>
       </div>`
   }),
@@ -320,7 +318,7 @@ const EMAIL_TEMPLATES = {
     bodyContent: `
       <p>Hi ${data.name || 'there'},</p>
       ${data.content || ''}
-      ${data.ctaUrl ? `<div style="text-align:center;margin:30px 0;"><a href="${data.ctaUrl}" class="button">${data.ctaLabel || 'Learn More'}</a></div>` : ''}`
+      ${data.ctaUrl ? `<div class="button-wrapper"><a href="${data.ctaUrl}" class="button">${data.ctaLabel || 'Learn More'}</a></div>` : ''}`
   }),
 
   // 11. TIER 2: Webinar Registration Confirmation
@@ -350,7 +348,7 @@ const EMAIL_TEMPLATES = {
         </ul>
       </div>
 
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="${data.calendarLink || 'https://platapay.ph/agents'}" class="button">Add to Calendar</a>
       </div>
 
@@ -382,7 +380,7 @@ const EMAIL_TEMPLATES = {
       </div>
       ` : ''}
 
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="https://platapay.ph/franchise" class="button">View Franchise Packages</a>
       </div>
 
@@ -414,7 +412,7 @@ const EMAIL_TEMPLATES = {
         <p>Top agents earn <strong>₱30,000-50,000+ monthly</strong> in high-traffic locations.</p>
       </div>
 
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="https://m.me/PlataPay?ref=EARNINGS" class="button">Ask About Earnings</a>
       </div>`
   }),
@@ -444,7 +442,7 @@ const EMAIL_TEMPLATES = {
 
       <p><strong>New branches opening weekly:</strong> Santa Rosa, Pasay, Davao, Cebu, and more!</p>
 
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="https://platapay.ph/testimonials" class="button">Read More Stories</a>
       </div>`
   }),
@@ -481,7 +479,7 @@ const EMAIL_TEMPLATES = {
         <p><strong>ROI Timeline:</strong> 3-22 months depending on location and volume</p>
       </div>
 
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="tel:+639176851216" class="button">📞 Schedule Orientation</a>
       </div>`
   }),
@@ -504,11 +502,11 @@ const EMAIL_TEMPLATES = {
 
       <p><strong>This week only:</strong> Schedule your FREE business orientation and get a complimentary starter kit consultation!</p>
 
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="tel:+639176851216" class="button" style="font-size:18px;padding:16px 32px;">📞 Call Now: +639176851216</a>
       </div>
 
-      <div style="text-align:center;margin:20px 0;">
+      <div class="button-wrapper">
         <a href="https://m.me/PlataPay?ref=APPLY" class="button button-purple">💬 Message Us on Messenger</a>
       </div>
 
@@ -1685,7 +1683,7 @@ async function enrollIn7DayDrip(contact, business, isAgentLead) {
           <div class="service-item">Remittance</div>
           <div class="service-item">Government Payments</div>
         </div>
-        <div style="text-align:center;margin:30px 0;">
+        <div class="button-wrapper">
           <a href="https://platapay.ph/agents" class="button">Find Nearest Agent</a>
         </div>
       ` }},
@@ -2806,7 +2804,7 @@ async function checkConversationSLA() {
                   <div class="service-item"><strong>Conversation ID:</strong> ${conv.id}</div>
                 </div>
                 <p>Please respond to this customer as soon as possible to maintain our service quality standards.</p>
-                <div style="text-align:center;margin:30px 0;">
+                <div class="button-wrapper">
                   <a href="https://dashboard.innoserver.cloud/conversations/${conv.id}" class="button">View Conversation</a>
                 </div>
               `
@@ -2884,7 +2882,7 @@ async function checkConversationSLA() {
                 <div class="service-item"><strong>Last Message:</strong> ${conv.get('lastMessageAt').toLocaleString('en-PH')}</div>
               </div>
               <p style="color:#dc3545;font-weight:bold;">An automatic apology has been sent to the customer. Please follow up immediately.</p>
-              <div style="text-align:center;margin:30px 0;">
+              <div class="button-wrapper">
                 <a href="https://dashboard.innoserver.cloud/conversations/${conv.id}" class="button" style="background-color:#dc3545;">Respond Now</a>
               </div>
             `
@@ -3394,7 +3392,7 @@ async function enrollInPostOnboardingNurture(lead, business) {
           <div class="note">
             <p><strong>Pro Tip:</strong> Start with e-loading — it's the easiest service and most in-demand!</p>
           </div>
-          <div style="text-align:center;margin:30px 0;">
+          <div class="button-wrapper">
             <a href="https://platapay.ph/training" class="button">Watch Training Videos</a>
           </div>
         `,
@@ -3422,7 +3420,7 @@ async function enrollInPostOnboardingNurture(lead, business) {
               <li>When do I get commissions? — Instantly after each transaction</li>
             </ul>
           </div>
-          <div style="text-align:center;margin:30px 0;">
+          <div class="button-wrapper">
             <a href="https://m.me/PlataPay?ref=SUPPORT" class="button">Get Help Now</a>
           </div>
         `,
@@ -3451,7 +3449,7 @@ async function enrollInPostOnboardingNurture(lead, business) {
               <li>Insurance Products — Recurring commissions</li>
             </ul>
           </div>
-          <div style="text-align:center;margin:30px 0;">
+          <div class="button-wrapper">
             <a href="tel:+639176851216" class="button">📞 Schedule a Review Call</a>
           </div>
         `,
@@ -3698,7 +3696,7 @@ async function sendAdminDailyDigest() {
       </div>
       ` : ''}
 
-      <div style="text-align:center;margin:30px 0;">
+      <div class="button-wrapper">
         <a href="https://dashboard.innoserver.cloud" class="button">Open Dashboard</a>
       </div>
     `;
