@@ -1503,6 +1503,9 @@ async function updateContactWithLeadInfo(contact, leadInfo) {
     contact.set('leadCapturedAt', new Date());
     await contact.save(null, { useMasterKey: true });
     console.log('[Lead] Contact updated with lead info for PSID:', contact.get('psid'));
+    
+    // Sync to Google Sheets
+    syncLeadToSheets(contact).catch(err => console.error('[Lead] Sheets sync failed:', err.message));
   }
   
   return updated;
@@ -6319,6 +6322,9 @@ app.post('/api/bookings', async (req, res) => {
     
     console.log('[Booking] Created:', confirmationCode, 'for', name, 'on', date, timeSlot);
     
+    // Sync to Google Sheets
+    syncBookingToSheets(booking).catch(err => console.error('[Booking] Sheets sync failed:', err.message));
+    
     res.json({ 
       success: true, 
       bookingId: booking.id,
@@ -6461,3 +6467,120 @@ app.post('/api/bookings/cancel', async (req, res) => {
 });
 
 console.log('[Server] Booking/Scheduling endpoints loaded');
+
+// =============================================================================
+// Google Sheets Sync for Leads & Bookings
+// =============================================================================
+
+const GOOGLE_SHEETS_ID = '1tJMLWrGUkraYERwAOeJ6l1WfSfOZ0C9CK1OajeQh0kA';
+const GOOGLE_TOKENS_PATH = '/root/.config/google-workspace-mcp/tokens.json';
+
+async function getGoogleAccessToken() {
+  try {
+    const tokens = JSON.parse(require('fs').readFileSync(GOOGLE_TOKENS_PATH, 'utf-8'));
+    
+    // Check if token is expired (with 5 min buffer)
+    if (tokens.expiry_date < Date.now() + 300000) {
+      // Refresh the token
+      const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: '338689075775-o75k922vn5fdl18qergr96rp8g63e4d7.apps.googleusercontent.com',
+          client_secret: 'GOCSPX-dummy', // This MCP uses a public client
+          refresh_token: tokens.refresh_token,
+          grant_type: 'refresh_token'
+        })
+      });
+      
+      if (refreshRes.ok) {
+        const newTokens = await refreshRes.json();
+        tokens.access_token = newTokens.access_token;
+        tokens.expiry_date = Date.now() + (newTokens.expires_in * 1000);
+        require('fs').writeFileSync(GOOGLE_TOKENS_PATH, JSON.stringify(tokens));
+        console.log('[GoogleSheets] Token refreshed');
+      }
+    }
+    
+    return tokens.access_token;
+  } catch (err) {
+    console.error('[GoogleSheets] Token error:', err.message);
+    return null;
+  }
+}
+
+async function appendToGoogleSheet(sheetName, values) {
+  try {
+    const accessToken = await getGoogleAccessToken();
+    if (!accessToken) {
+      console.error('[GoogleSheets] No access token available');
+      return false;
+    }
+    
+    const range = `${sheetName}!A:Z`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+    
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        values: [values]
+      })
+    });
+    
+    if (res.ok) {
+      console.log('[GoogleSheets] Row added to', sheetName);
+      return true;
+    } else {
+      const err = await res.json();
+      console.error('[GoogleSheets] Error:', err.error?.message || JSON.stringify(err));
+      return false;
+    }
+  } catch (err) {
+    console.error('[GoogleSheets] Append error:', err.message);
+    return false;
+  }
+}
+
+// Sync lead to Google Sheets
+async function syncLeadToSheets(contact) {
+  const now = new Date().toISOString().split('T')[0];
+  const values = [
+    now, // Date
+    `${contact.get('firstName') || ''} ${contact.get('lastName') || ''}`.trim() || 'Unknown', // Name
+    contact.get('email') || '', // Email
+    contact.get('phone') || '', // Phone
+    contact.get('location') || '', // Location
+    contact.get('channel') || 'messenger', // Source
+    contact.get('interest') || '', // Interest
+    'New', // Status
+    '', // Comments
+    now, // Last Updated
+    contact.id // Contact ID
+  ];
+  
+  return appendToGoogleSheet('Leads', values);
+}
+
+// Sync booking to Google Sheets
+async function syncBookingToSheets(booking) {
+  const now = new Date().toISOString().split('T')[0];
+  const values = [
+    now, // Date Booked
+    booking.get('name') || '', // Name
+    booking.get('email') || '', // Email
+    booking.get('phone') || '', // Phone
+    booking.get('date') || '', // Appointment Date
+    booking.get('timeSlot') || '', // Time Slot
+    booking.get('confirmationCode') || '', // Booking Ref
+    booking.get('status') || 'pending', // Status
+    booking.get('notes') || '' // Notes
+  ];
+  
+  return appendToGoogleSheet('Bookings', values);
+}
+
+console.log('[Server] Google Sheets sync loaded — Sheet ID:', GOOGLE_SHEETS_ID);
