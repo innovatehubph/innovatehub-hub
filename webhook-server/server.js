@@ -10,6 +10,9 @@ const fetch = require('node-fetch');
 const nodemailer = require('nodemailer');
 const ImageGenerator = require('../image-generator');
 const OpenRouterImageGenerator = require('../image-generator/openrouter-provider');
+const sheetsIntegration = require('./sheets-integration');
+const googleOAuth = require('./google-oauth');
+const phLocations = require('./ph-locations');
 
 // --- Configuration ---
 const PORT = 3790;
@@ -145,13 +148,19 @@ const EMAIL_TEMPLATES = {
         <div class="service-item">Earn commissions on every transaction</div>
         <div class="service-item">13+ services in one platform (bills, e-load, remittance, and more)</div>
         <div class="service-item">Full training and ongoing support</div>
-        <div class="service-item">80,000+ strong agent network</div>
+        <div class="service-item">Growing agent network all over the Philippines</div>
         <div class="service-item">BSP-compliant and secure platform</div>
       </div>
       <div class="button-wrapper">
         <a href="https://platapay.ph/franchise" class="button">Explore Business Packages</a>
       </div>
-      <p>A PlataPay representative will be in touch with you shortly. In the meantime, feel free to explore our website or message us on <a href="https://m.me/PlataPay">Facebook Messenger</a>.</p>
+      <p>A PlataPay representative will be in touch with you shortly. In the meantime, feel free to explore our website or message us directly:</p>
+      <div class="button-wrapper">
+        <a href="https://m.me/PlataPay" style="display:inline-flex;align-items:center;background:#0084FF;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Facebook_Messenger_logo_2020.svg/512px-Facebook_Messenger_logo_2020.svg.png" alt="Messenger" style="width:22px;height:22px;margin-right:8px;">
+          Message Us on Messenger
+        </a>
+      </div>
       <div class="note">
         <p><strong>Questions?</strong> Call/Viber us at <strong>+639176851216</strong> or email <a href="mailto:marketing@innovatehub.ph">marketing@innovatehub.ph</a></p>
       </div>`
@@ -296,7 +305,10 @@ const EMAIL_TEMPLATES = {
       </div>
       <p style="font-size:14px;color:#666;">*Earnings are estimates and depend on location, effort, and transaction volume.</p>
       <div class="button-wrapper">
-        <a href="https://m.me/PlataPay" class="button">Chat With Us to Learn More</a>
+        <a href="https://m.me/PlataPay" style="display:inline-flex;align-items:center;background:#0084FF;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Facebook_Messenger_logo_2020.svg/512px-Facebook_Messenger_logo_2020.svg.png" alt="Messenger" style="width:24px;height:24px;margin-right:10px;">
+          Chat With Us to Learn More
+        </a>
       </div>`
   }),
 
@@ -319,7 +331,7 @@ const EMAIL_TEMPLATES = {
         <p><em>"Being a PlataPay agent has opened new opportunities for my community."</em></p>
         <p style="font-size:14px;color:#666;">— Juan dela Cruz, PlataPay Agent</p>
       </div>
-      <p>We now have <strong>80,000+ agents</strong> in locations like Santa Rosa (Laguna), Pasay City, Anahawan (Southern Leyte), Cabagan (Isabela), Sta. Ana (Manila), and many more!</p>
+      <p>Our growing agent network spans locations like Santa Rosa (Laguna), Pasay City, Anahawan (Southern Leyte), Cabagan (Isabela), Sta. Ana (Manila), and many more across the Philippines!</p>
       <div class="button-wrapper">
         <a href="https://platapay.ph/franchise" class="button">Start Your PlataPay Business</a>
       </div>`
@@ -341,10 +353,13 @@ const EMAIL_TEMPLATES = {
         <div class="service-item">ROI as fast as 3 months</div>
       </div>
       <div class="button-wrapper">
-        <a href="tel:+639176851216" class="button" style="margin-bottom:10px;">📞 Call Now: +639176851216</a>
+        <a href="tel:+639176851216" class="button" style="margin-bottom:10px;">Call Now: +639176851216</a>
       </div>
       <div class="button-wrapper">
-        <a href="https://m.me/PlataPay" class="button button-purple">💬 Message Us on Messenger</a>
+        <a href="https://m.me/PlataPay" style="display:inline-flex;align-items:center;background:#0084FF;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Facebook_Messenger_logo_2020.svg/512px-Facebook_Messenger_logo_2020.svg.png" alt="Messenger" style="width:24px;height:24px;margin-right:10px;">
+          Message Us on Messenger
+        </a>
       </div>
       <p style="text-align:center;margin-top:20px;font-size:14px;color:#666;">Or email us at <a href="mailto:marketing@innovatehub.ph">marketing@innovatehub.ph</a></p>
       <div class="note">
@@ -442,7 +457,7 @@ const EMAIL_TEMPLATES = {
       <div class="highlight-box">
         <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Quick Recap</h3>
         <div class="service-item">PlataPay offers 13+ revenue-generating services</div>
-        <div class="service-item">80,000+ agents nationwide</div>
+        <div class="service-item">Growing agent network nationwide</div>
         <div class="service-item">Business Lite package: ₱449,000 (3-year contract)</div>
         <div class="service-item">All-in-One package: ₱799,000 (lifetime contract)</div>
         <div class="service-item">ROI as fast as 3 months</div>
@@ -489,7 +504,10 @@ const EMAIL_TEMPLATES = {
       </div>
 
       <div class="button-wrapper">
-        <a href="https://m.me/PlataPay?ref=EARNINGS" class="button">Ask About Earnings</a>
+        <a href="https://m.me/PlataPay?ref=EARNINGS" style="display:inline-flex;align-items:center;background:#0084FF;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Facebook_Messenger_logo_2020.svg/512px-Facebook_Messenger_logo_2020.svg.png" alt="Messenger" style="width:24px;height:24px;margin-right:10px;">
+          Ask About Earnings
+        </a>
       </div>`
   }),
 
@@ -499,7 +517,7 @@ const EMAIL_TEMPLATES = {
     preheader: 'See how PlataPay agents are thriving',
     bodyContent: `
       <p>Hi ${data.name || 'there'}!</p>
-      <p>Don't just take our word for it — here's what our <strong>80,000+ agents</strong> are saying:</p>
+      <p>Don't just take our word for it — here's what our agents from all over the Philippines are saying:</p>
       
       <div class="highlight-box" style="border-left:4px solid ${PLATAPAY_BRAND_COLOR};">
         <p><em>"PlataPay transformed my sari-sari store into a one-stop payment center. My customers love the convenience!"</em></p>
@@ -570,7 +588,7 @@ const EMAIL_TEMPLATES = {
       
       <div class="highlight-box">
         <div class="service-item">13+ services in one platform</div>
-        <div class="service-item">Join 80,000+ successful agents</div>
+        <div class="service-item">Join our growing network of successful agents</div>
         <div class="service-item">Earn ₱10,000-50,000+ monthly</div>
         <div class="service-item">Full training and ongoing support</div>
         <div class="service-item">BSP-compliant, secure platform</div>
@@ -583,7 +601,10 @@ const EMAIL_TEMPLATES = {
       </div>
 
       <div class="button-wrapper">
-        <a href="https://m.me/PlataPay?ref=APPLY" class="button button-purple">💬 Message Us on Messenger</a>
+        <a href="https://m.me/PlataPay?ref=APPLY" style="display:inline-flex;align-items:center;background:#0084FF;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Facebook_Messenger_logo_2020.svg/512px-Facebook_Messenger_logo_2020.svg.png" alt="Messenger" style="width:24px;height:24px;margin-right:10px;">
+          Message Us on Messenger
+        </a>
       </div>
 
       <div class="note">
@@ -602,9 +623,9 @@ const EMAIL_TEMPLATES = {
       <p>Great news! Your PlataPay orientation has been scheduled.</p>
       
       <div class="highlight-box" style="text-align:center;">
-        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">📅 Appointment Details</h3>
+        <h3 style="margin:0 0 15px;color:${PLATAPAY_BRAND_COLOR};">Appointment Details</h3>
         <div style="font-size:24px;font-weight:bold;color:${PLATAPAY_BRAND_COLOR};margin:10px 0;">${data.date}</div>
-        <div style="font-size:20px;margin:10px 0;">🕐 ${data.timeSlot}</div>
+        <div style="font-size:20px;margin:10px 0;">${data.timeSlot}</div>
         <div style="background:#f0f0f0;padding:10px;border-radius:8px;margin:15px 0;">
           <strong>Booking Reference:</strong><br>
           <span style="font-size:28px;font-weight:bold;letter-spacing:3px;color:${PLATAPAY_BRAND_COLOR};">${data.confirmationCode}</span>
@@ -612,23 +633,45 @@ const EMAIL_TEMPLATES = {
       </div>
       
       <div class="highlight-box">
-        <h4 style="margin:0 0 10px;">📍 Location</h4>
-        <p style="margin:0;">${data.location || 'InnovateHub Office, San Antonio, San Pascual, Batangas'}</p>
-        <p style="margin:10px 0 0;"><a href="${data.mapLink || 'https://maps.app.goo.gl/PErGsbGkAiPVViPS6'}" style="color:${PLATAPAY_BRAND_COLOR};">Open in Google Maps →</a></p>
+        <table style="width:100%;border:none;">
+          <tr>
+            <td style="width:40px;vertical-align:top;padding-right:12px;">
+              <img src="https://maps.google.com/mapfiles/kml/shapes/placemark_circle.png" alt="Location" style="width:32px;height:32px;">
+            </td>
+            <td style="vertical-align:top;">
+              <h4 style="margin:0 0 8px;color:#333;">Location</h4>
+              <p style="margin:0;color:#555;">${data.location || 'InnovateHub Office, San Antonio, San Pascual, Batangas'}</p>
+            </td>
+          </tr>
+        </table>
+        <div style="margin-top:15px;">
+          <a href="${data.mapLink || 'https://maps.app.goo.gl/PErGsbGkAiPVViPS6'}" style="display:inline-flex;align-items:center;background:#4285F4;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+            <img src="https://www.gstatic.com/images/branding/product/1x/maps_2020q4_48dp.png" alt="Google Maps" style="width:24px;height:24px;margin-right:10px;">
+            Open in Google Maps
+          </a>
+        </div>
       </div>
       
       <div class="highlight-box">
-        <h4 style="margin:0 0 10px;">📝 What to Bring</h4>
-        <p style="margin:0;">• Valid ID<br>• Questions about the franchise<br>• Notebook (optional)</p>
+        <h4 style="margin:0 0 10px;color:#333;">What to Bring</h4>
+        <p style="margin:0;color:#555;">• Valid ID<br>• Questions about the franchise<br>• Notebook (optional)</p>
       </div>
       
       <div class="button-wrapper">
-        <a href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=PlataPay+Orientation&dates=${data.calendarDate || ''}&details=Confirmation+Code:+${data.confirmationCode}&location=InnovateHub+San+Antonio+San+Pascual+Batangas" class="button">Add to Google Calendar</a>
+        <a href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=PlataPay+Orientation&dates=${data.calendarDate || ''}&details=Confirmation+Code:+${data.confirmationCode}&location=InnovateHub+San+Antonio+San+Pascual+Batangas" class="button" style="display:inline-flex;align-items:center;">
+          <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png" alt="Calendar" style="width:20px;height:20px;margin-right:8px;">
+          Add to Google Calendar
+        </a>
       </div>
       
       <div class="note">
         <p><strong>Can't make it?</strong> No worries! Just message our PlataPay Assistant on Messenger with your booking reference <strong>${data.confirmationCode}</strong> to reschedule or cancel.</p>
-        <p style="margin-top:10px;"><a href="https://m.me/platapayph" style="color:${PLATAPAY_BRAND_COLOR};">💬 Message PlataPay Assistant</a></p>
+        <div style="margin-top:15px;">
+          <a href="https://m.me/platapayph" style="display:inline-flex;align-items:center;background:#0084FF;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Facebook_Messenger_logo_2020.svg/512px-Facebook_Messenger_logo_2020.svg.png" alt="Messenger" style="width:24px;height:24px;margin-right:10px;">
+            Message on Messenger
+          </a>
+        </div>
       </div>`
   }),
 
@@ -642,7 +685,10 @@ const EMAIL_TEMPLATES = {
       <p>Confirmation code: <strong>${data.confirmationCode}</strong></p>
       
       <div class="button-wrapper">
-        <a href="https://m.me/platapayph" class="button">Reschedule on Messenger</a>
+        <a href="https://m.me/platapayph" style="display:inline-flex;align-items:center;background:#0084FF;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Facebook_Messenger_logo_2020.svg/512px-Facebook_Messenger_logo_2020.svg.png" alt="Messenger" style="width:24px;height:24px;margin-right:10px;">
+          Reschedule on Messenger
+        </a>
       </div>
       
       <p>If you didn't request this cancellation, please contact us immediately at +639176851216.</p>`
@@ -786,7 +832,7 @@ Key Advantages:
 - Vision: To become the leading digital payment platform connecting every Filipino to essential financial services
 
 ## KEY STATS
-- 80,000+ active agents nationwide
+- Growing agent network all over the Philippines
 - 1,000,000+ transactions processed
 - 100+ partner organizations
 - 24/7 customer support
@@ -989,6 +1035,12 @@ const app = express();
 app.use(express.json({ limit: '5mb' }));
 app.use('/assets', express.static('/root/innovatehub-hub/docs/assets'));
 app.use('/generated', express.static('/root/innovatehub-hub/image-generator/generated'));
+
+// Setup Google OAuth routes
+googleOAuth.setupOAuthRoutes(app);
+
+// Setup Philippine Locations routes
+phLocations.setupRoutes(app);
 
 // =============================================================================
 // Helpers
@@ -1853,7 +1905,7 @@ async function sendPipelineStageEmail(lead, business, newStage) {
         <div class="service-item">3. Watch the training videos</div>
         <div class="service-item">4. Start processing transactions!</div>
       </div>
-      <p>Welcome to a network of <strong>80,000+ agents</strong> serving communities across the Philippines!</p>
+      <p>Welcome to our growing network of agents serving communities all over the Philippines!</p>
       <div class="note"><p><strong>Support:</strong> Call/Viber us at <strong>+639176851216</strong> or email <a href="mailto:marketing@innovatehub.ph">marketing@innovatehub.ph</a> anytime.</p></div>`
     }},
   };
@@ -6472,39 +6524,16 @@ console.log('[Server] Booking/Scheduling endpoints loaded');
 // Google Sheets Sync for Leads & Bookings
 // =============================================================================
 
-const GOOGLE_SHEETS_ID = '1-8koQ65u4aLe4XGKihjQ1Oho2GiHCaodaN3PJK6eKLo';
+const GOOGLE_SHEETS_ID = '1tJMLWrGUkraYERwAOeJ6l1WfSfOZ0C9CK1OajeQh0kA'; // PlataPay Leads Tracker
 const GOOGLE_TOKENS_PATH = '/root/.config/google-workspace-mcp/tokens.json';
 
 async function getGoogleAccessToken() {
   try {
-    const tokens = JSON.parse(require('fs').readFileSync(GOOGLE_TOKENS_PATH, 'utf-8'));
-    
-    // Check if token is expired (with 5 min buffer)
-    if (tokens.expiry_date < Date.now() + 300000) {
-      // Refresh the token
-      const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: '338689075775-o75k922vn5fdl18qergr96rp8g63e4d7.apps.googleusercontent.com',
-          client_secret: 'GOCSPX-dummy', // This MCP uses a public client
-          refresh_token: tokens.refresh_token,
-          grant_type: 'refresh_token'
-        })
-      });
-      
-      if (refreshRes.ok) {
-        const newTokens = await refreshRes.json();
-        tokens.access_token = newTokens.access_token;
-        tokens.expiry_date = Date.now() + (newTokens.expires_in * 1000);
-        require('fs').writeFileSync(GOOGLE_TOKENS_PATH, JSON.stringify(tokens));
-        console.log('[GoogleSheets] Token refreshed');
-      }
-    }
-    
-    return tokens.access_token;
+    // Use the OAuth module for proper token handling
+    return await googleOAuth.getValidAccessToken();
   } catch (err) {
     console.error('[GoogleSheets] Token error:', err.message);
+    console.error('[GoogleSheets] Please login at: https://webhook.innoserver.cloud/oauth/login');
     return null;
   }
 }
@@ -6545,44 +6574,995 @@ async function appendToGoogleSheet(sheetName, values) {
   }
 }
 
-// Sync lead to Google Sheets
+// Sync lead to Google Sheets using sheets-integration module
 async function syncLeadToSheets(contact) {
-  const now = new Date().toISOString().split('T')[0];
-  const values = [
-    now, // 📅 Date Captured
-    `${contact.get('firstName') || ''} ${contact.get('lastName') || ''}`.trim() || 'Unknown', // 👤 Name
-    contact.get('email') || '', // 📧 Email
-    contact.get('phone') || '', // 📱 Phone
-    contact.get('location') || '', // 📍 Location
-    contact.get('channel') || 'Messenger', // 💬 Source
-    '', // 🎯 Interest (to be filled)
-    '🆕 New', // 📊 Status
-    '', // 💼 Package Interest
-    '', // 📝 Comments
-    now, // 🔄 Last Updated
-    contact.id // 🔑 Contact ID
-  ];
-  
-  return appendToGoogleSheet('Leads', values);
+  try {
+    const name = `${contact.get('firstName') || ''} ${contact.get('lastName') || ''}`.trim() || 'Unknown';
+    const result = await sheetsIntegration.addLead({
+      name,
+      email: contact.get('email') || '',
+      phone: contact.get('phone') || '',
+      location: contact.get('location') || '',
+      source: contact.get('channel') || 'Messenger',
+      interest: 'PlataPay Agent',
+      status: 'New',
+      comments: `PSID: ${contact.get('psid') || ''}`
+    });
+    
+    // Also log the lead capture as a conversation
+    await sheetsIntegration.logConversation({
+      contactId: result.contactId,
+      name,
+      platform: 'Messenger',
+      direction: 'system',
+      message: 'Lead captured',
+      intent: 'lead_capture',
+      agent: 'System'
+    });
+    
+    return result.success;
+  } catch (err) {
+    console.error('[Lead] Sheets sync error:', err.message);
+    return false;
+  }
 }
 
-// Sync booking to Google Sheets
+// Sync booking to Google Sheets using sheets-integration module
 async function syncBookingToSheets(booking) {
-  const now = new Date().toISOString().split('T')[0];
-  const values = [
-    now, // 📅 Date Booked
-    booking.get('name') || '', // 👤 Name
-    booking.get('email') || '', // 📧 Email
-    booking.get('phone') || '', // 📱 Phone
-    booking.get('date') || '', // 🗓️ Appointment Date
-    booking.get('timeSlot') || '', // 🕐 Time Slot
-    booking.get('confirmationCode') || '', // 🎫 Booking Ref
-    '⏳ Pending', // 📊 Status
-    booking.get('notes') || '', // 📝 Notes
-    'Pending' // ✅ Attended
-  ];
-  
-  return appendToGoogleSheet('Bookings', values);
+  try {
+    // Handle both Parse objects and plain objects
+    const isParseObj = booking && typeof booking.get === 'function';
+    const name = isParseObj ? booking.get('name') : booking.name;
+    const email = isParseObj ? booking.get('email') : booking.email;
+    const phone = isParseObj ? booking.get('phone') : booking.phone;
+    const date = isParseObj ? booking.get('date') : booking.date;
+    const timeSlot = isParseObj ? booking.get('timeSlot') : booking.timeSlot;
+    const notes = isParseObj ? booking.get('notes') : booking.notes;
+    const confirmationCode = isParseObj ? booking.get('confirmationCode') : booking.confirmationCode;
+    
+    const result = await sheetsIntegration.addBooking({
+      name: name || '',
+      email: email || '',
+      phone: phone || '',
+      appointmentDate: date || '',
+      timeSlot: timeSlot || '',
+      bookingRef: confirmationCode, // Use existing code if available
+      status: 'pending',
+      notes: notes || ''
+    });
+    
+    // Create a follow-up task for the booking
+    await sheetsIntegration.addTask({
+      contactId: result.bookingRef,
+      name: name || '',
+      type: 'Appointment',
+      description: `Meeting scheduled for ${date} at ${timeSlot}`,
+      dueDate: date,
+      priority: 'High'
+    });
+    
+    return result;
+  } catch (err) {
+    console.error('[Booking] Sheets sync error:', err.message);
+    return { success: false, error: err.message };
+  }
 }
 
-console.log('[Server] Google Sheets sync loaded — Sheet ID:', GOOGLE_SHEETS_ID);
+// Log conversation to Google Sheets
+async function logConversationToSheets(contactInfo, message, response, direction = 'inbound') {
+  try {
+    await sheetsIntegration.logConversation({
+      contactId: contactInfo.contactId || '',
+      name: contactInfo.name || '',
+      platform: 'Messenger',
+      direction,
+      message: message.substring(0, 500), // Limit length
+      response: response ? response.substring(0, 500) : '',
+      agent: 'AI'
+    });
+  } catch (err) {
+    console.error('[Conv] Sheets log error:', err.message);
+  }
+}
+
+// =============================================================================
+// Agents Lookup by Location (Social Proof)
+// =============================================================================
+const AGENTS_SHEET_ID = '1Co0RkDiitvD71LqEwEan8ErPqj6fXm-R7RK2DJJIAfk';
+let cachedAgents = null;
+let agentsCacheTime = 0;
+const AGENTS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+async function getAgentsData() {
+  // Return cached data if still valid
+  if (cachedAgents && Date.now() - agentsCacheTime < AGENTS_CACHE_TTL) {
+    return cachedAgents;
+  }
+  
+  try {
+    const accessToken = await getGoogleAccessToken();
+    if (!accessToken) return [];
+    
+    // Fetch more columns to find location and status (increased range for all agents)
+    const range = encodeURIComponent('Agents Onboarded!A2:Z1000');
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${AGENTS_SHEET_ID}/values/${range}`;
+    
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    
+    if (!res.ok) return [];
+    
+    const data = await res.json();
+    const rows = data.values || [];
+    
+    // Parse agents - include all except inactive/expired
+    cachedAgents = rows.map(row => {
+      const rowStr = row.join(' ').toLowerCase();
+      const isInactive = rowStr.includes('inactive') || rowStr.includes('expired');
+      return {
+        name: row[0] || row[1] || '', // Name is usually in A or B
+        location: row[5] || '',        // Location in column F
+        businessName: row[7] || '',    // Business name
+        isActive: !isInactive
+      };
+    }).filter(a => a.location && a.isActive);
+    
+    agentsCacheTime = Date.now();
+    console.log(`[Agents] Cached ${cachedAgents.length} active agents`);
+    return cachedAgents;
+  } catch (err) {
+    console.error('[Agents] Fetch error:', err.message);
+    return cachedAgents || [];
+  }
+}
+
+// Find agents near a location
+async function findAgentsByLocation(location) {
+  const agents = await getAgentsData();
+  if (!location || !agents.length) return [];
+  
+  const searchTerm = location.toLowerCase();
+  const matches = [];
+  
+  // Philippine provinces/cities/areas to match
+  const locationTerms = searchTerm.split(/[,\s]+/).filter(t => t.length > 2);
+  
+  for (const agent of agents) {
+    const agentLoc = agent.location.toLowerCase();
+    
+    // Check if any search term matches agent location
+    for (const term of locationTerms) {
+      if (agentLoc.includes(term)) {
+        matches.push({
+          name: agent.name,
+          location: agent.location
+        });
+        break;
+      }
+    }
+  }
+  
+  return matches.slice(0, 5); // Max 5 matches
+}
+
+// API endpoint for location-based agent lookup
+app.get('/api/agents/by-location', async (req, res) => {
+  try {
+    const { location } = req.query;
+    if (!location) {
+      return res.status(400).json({ error: 'location parameter required' });
+    }
+    
+    const agents = await findAgentsByLocation(location);
+    
+    res.json({
+      success: true,
+      location,
+      count: agents.length,
+      agents,
+      message: agents.length > 0 
+        ? `May ${agents.length} PlataPay agents na sa area niyo!`
+        : 'Maging isa sa mga unang PlataPay agents sa area mo!'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+console.log('[Server] Agents location lookup loaded');
+
+// =============================================================================
+// Email Campaign Management APIs
+// =============================================================================
+
+// Get all campaigns
+app.get('/api/campaigns', async (req, res) => {
+  try {
+    const { status } = req.query;
+    const campaigns = await sheetsIntegration.getCampaigns(status || null);
+    res.json({ success: true, count: campaigns.length, campaigns });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Schedule an email
+app.post('/api/campaigns/schedule', async (req, res) => {
+  try {
+    const result = await sheetsIntegration.scheduleEmail(req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get pending emails
+app.get('/api/campaigns/pending', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const pending = await sheetsIntegration.getPendingEmails(date);
+    res.json({ success: true, count: pending.length, emails: pending });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Enroll lead in drip campaign
+app.post('/api/campaigns/enroll', async (req, res) => {
+  try {
+    const { leadId, name, email, campaignType } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'email required' });
+    }
+    
+    const result = await sheetsIntegration.enrollInCampaign({
+      contactId: leadId,
+      name: name || 'Lead',
+      email
+    }, campaignType || 'nurture');
+    
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update email schedule status (for tracking sends/opens/clicks)
+app.put('/api/campaigns/schedule/:id', async (req, res) => {
+  try {
+    const result = await sheetsIntegration.updateEmailSchedule(req.params.id, req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+console.log('[Server] Email campaign management loaded');
+
+// =============================================================================
+// Knowledge Base Management
+// =============================================================================
+const knowledgeUpdater = require('./knowledge-updater');
+
+// Get current knowledge base
+app.get('/api/knowledge', (req, res) => {
+  try {
+    const kb = knowledgeUpdater.loadKnowledgeBase();
+    const summary = knowledgeUpdater.generateAISummary(kb);
+    res.json({ 
+      success: true, 
+      lastUpdated: kb.lastUpdated,
+      agents: kb.agents,
+      website: kb.website,
+      facebook: kb.facebook,
+      updates: kb.updates?.slice(-10),
+      summary 
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manually trigger knowledge base update
+app.post('/api/knowledge/update', async (req, res) => {
+  try {
+    console.log('[KB] Manual update triggered via API');
+    const kb = await knowledgeUpdater.updateKnowledgeBase();
+    res.json({ 
+      success: true, 
+      message: 'Knowledge base updated',
+      agents: kb.agents?.totalActive,
+      updates: kb.updates?.length
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get AI-formatted knowledge for injection into prompts
+app.get('/api/knowledge/ai-context', (req, res) => {
+  try {
+    const kb = knowledgeUpdater.loadKnowledgeBase();
+    
+    // Format for AI consumption
+    const context = `
+## LIVE DATA (Updated: ${kb.lastUpdated || 'Never'})
+- Active Agents: ${kb.agents?.totalActive || 'Unknown'}
+- Top Locations: ${kb.agents?.topLocations?.join(', ') || 'N/A'}
+- Agents by Area: Batangas (${kb.agents?.byLocation?.batangas || 0}), Metro Manila (${kb.agents?.byLocation?.manila || 0}), Bulacan (${kb.agents?.byLocation?.bulacan || 0}), Cebu (${kb.agents?.byLocation?.cebu || 0})
+${kb.facebook?.recentPosts?.length ? `\n## Recent Facebook Updates\n${kb.facebook.recentPosts.slice(0, 2).map(p => `- ${p.message?.substring(0, 100) || 'Post'}`).join('\n')}` : ''}
+`;
+    
+    res.type('text/plain').send(context.trim());
+  } catch (err) {
+    res.status(500).send('Error loading knowledge base');
+  }
+});
+
+console.log('[Server] Knowledge base management loaded');
+
+// =============================================================================
+// Campaign Image Management
+// =============================================================================
+
+// Update campaign with image prompt and generated URL
+app.put('/api/campaigns/:id/image', async (req, res) => {
+  try {
+    const { imagePrompt, imageUrl, imageStatus } = req.body;
+    const campaignId = req.params.id;
+    
+    const accessToken = await getGoogleAccessToken();
+    if (!accessToken) {
+      return res.status(500).json({ error: 'No access token' });
+    }
+    
+    // Find the campaign row
+    const getUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/${encodeURIComponent('Campaigns!A:R')}`;
+    const getRes = await fetch(getUrl, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    
+    if (!getRes.ok) {
+      return res.status(500).json({ error: 'Failed to fetch campaigns' });
+    }
+    
+    const data = await getRes.json();
+    const rows = data.values || [];
+    let rowIndex = -1;
+    
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === campaignId) {
+        rowIndex = i + 1; // 1-indexed
+        break;
+      }
+    }
+    
+    if (rowIndex === -1) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+    
+    // Update image columns (O, P, Q = 15, 16, 17)
+    const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/${encodeURIComponent(`Campaigns!O${rowIndex}:Q${rowIndex}`)}?valueInputOption=RAW`;
+    const updateRes = await fetch(updateUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        values: [[imagePrompt || '', imageUrl || '', imageStatus || 'pending']]
+      })
+    });
+    
+    if (!updateRes.ok) {
+      const err = await updateRes.json();
+      return res.status(500).json({ error: err.error?.message || 'Update failed' });
+    }
+    
+    console.log(`[Campaign] Updated image for ${campaignId}`);
+    res.json({ success: true, campaignId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate AI image for a campaign
+app.post('/api/campaigns/:id/generate-image', async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+    const { prompt } = req.body;
+    
+    if (!prompt) {
+      return res.status(400).json({ error: 'prompt required' });
+    }
+    
+    // Use OpenRouter to generate image
+    const imageRes = await fetch('https://openrouter.ai/api/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer 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',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-image-1',
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024'
+      })
+    });
+    
+    if (!imageRes.ok) {
+      const err = await imageRes.text();
+      console.error('[Campaign] Image generation failed:', err);
+      return res.status(500).json({ error: 'Image generation failed' });
+    }
+    
+    const imageData = await imageRes.json();
+    const imageUrl = imageData.data?.[0]?.url;
+    
+    if (!imageUrl) {
+      return res.status(500).json({ error: 'No image URL returned' });
+    }
+    
+    // Update the campaign with the image URL
+    const accessToken = await getGoogleAccessToken();
+    // ... (update sheet with imageUrl)
+    
+    console.log(`[Campaign] Generated image for ${campaignId}`);
+    res.json({ success: true, campaignId, imageUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Batch update all campaign headers to include image columns
+app.post('/api/campaigns/setup-image-columns', async (req, res) => {
+  try {
+    const accessToken = await getGoogleAccessToken();
+    if (!accessToken) {
+      return res.status(500).json({ error: 'No access token' });
+    }
+    
+    // Update header row
+    const headerUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/${encodeURIComponent('Campaigns!A1:R1')}?valueInputOption=RAW`;
+    await fetch(headerUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        values: [[
+          'Campaign ID', 'Campaign Name', 'Type', 'Description', 'Target Audience',
+          'Email Template', 'Subject Line', 'Sequence Day', 'Status', 'Start Date',
+          'End Date', 'Total Sent', 'Opens', 'Clicks', 'Image Prompt', 'Image URL',
+          'Image Status', 'Created'
+        ]]
+      })
+    });
+    
+    // Add default image prompts for each campaign
+    const prompts = [
+      { id: 'CMP001', prompt: 'Welcoming Filipino business owner at modern PlataPay payment center, warm lighting, professional, purple branding' },
+      { id: 'CMP002', prompt: 'Multiple payment service icons floating around smartphone - bills, e-load, remittance, bank - purple and green colors' },
+      { id: 'CMP003', prompt: 'Happy Filipino entrepreneur viewing earnings dashboard on tablet, sari-sari store background, golden sunlight' },
+      { id: 'CMP004', prompt: 'Collage of smiling Filipino PlataPay agents from different provinces with their successful business centers' },
+      { id: 'CMP005', prompt: 'Urgent call-to-action: clock showing limited time, excited Filipino business owner ready to start, purple gradient' },
+      { id: 'CMP006', prompt: 'Professional Filipino agent at PlataPay business center serving happy customers, modern POS equipment' },
+      { id: 'CMP007', prompt: 'Warm reconnection theme: two hands reaching toward each other, PlataPay purple logo, heartfelt reunion' },
+      { id: 'CMP008', prompt: 'Calendar with marked appointment date, professional office, handshake, green confirmation checkmark' },
+      { id: 'CMP009', prompt: 'Celebration scene: confetti, welcome to the family banner, new agent receiving PlataPay certificate' },
+      { id: 'CMP010', prompt: 'Dashboard analytics on tablet showing weekly performance charts, coins, growth arrows, professional desk' }
+    ];
+    
+    for (let i = 0; i < prompts.length; i++) {
+      const rowNum = i + 2;
+      const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/${encodeURIComponent(`Campaigns!O${rowNum}:Q${rowNum}`)}?valueInputOption=RAW`;
+      await fetch(updateUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          values: [[prompts[i].prompt, '', 'pending']]
+        })
+      });
+    }
+    
+    console.log('[Campaign] Setup image columns complete');
+    res.json({ success: true, message: 'Image columns added to Campaigns sheet', campaigns: prompts.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+console.log('[Server] Campaign image management loaded');
+
+// =============================================================================
+// Google Maps Leads Scraper
+// =============================================================================
+const mapsScraper = require('./maps-scraper');
+
+// Get available locations
+app.get('/api/maps/locations', (req, res) => {
+  res.json({
+    success: true,
+    locations: Object.keys(mapsScraper.PHILIPPINE_LOCATIONS),
+    businessTypes: mapsScraper.TARGET_BUSINESS_TYPES
+  });
+});
+
+// Scrape leads from Google Maps
+app.post('/api/maps/scrape', async (req, res) => {
+  try {
+    const { locations, businessTypes, limit } = req.body;
+    
+    console.log('[Maps] Starting scrape:', { locations, businessTypes });
+    
+    const result = await mapsScraper.scrapeLeads({
+      locations: locations || ['batangas'],
+      businessTypes: businessTypes || mapsScraper.TARGET_BUSINESS_TYPES.slice(0, 3),
+      saveToFile: true
+    });
+    
+    // Optionally add to leads sheet
+    if (req.body.addToSheet && result.leads.length > 0) {
+      const leadsToAdd = (limit ? result.leads.slice(0, limit) : result.leads);
+      
+      for (const lead of leadsToAdd.slice(0, 10)) { // Max 10 at a time
+        try {
+          await sheetsIntegration.addLead({
+            name: lead.name,
+            phone: lead.phone,
+            location: lead.location,
+            source: lead.source,
+            interest: lead.interest,
+            status: lead.status,
+            comments: lead.comments
+          });
+        } catch (err) {
+          console.error('[Maps] Failed to add lead:', err.message);
+        }
+      }
+    }
+    
+    res.json({
+      success: true,
+      total: result.total,
+      locations: result.locations,
+      sample: result.leads.slice(0, 5),
+      message: `Found ${result.total} potential leads`
+    });
+  } catch (err) {
+    console.error('[Maps] Scrape error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get scraped leads files
+app.get('/api/maps/leads', (req, res) => {
+  try {
+    const fs = require('fs');
+    const leadsDir = path.join(__dirname, 'scraped-leads');
+    
+    if (!fs.existsSync(leadsDir)) {
+      return res.json({ success: true, files: [], leads: [] });
+    }
+    
+    const files = fs.readdirSync(leadsDir).filter(f => f.endsWith('.json'));
+    
+    // Get latest file
+    if (files.length > 0) {
+      const latestFile = files.sort().reverse()[0];
+      const leads = JSON.parse(fs.readFileSync(path.join(leadsDir, latestFile), 'utf8'));
+      return res.json({
+        success: true,
+        files,
+        latestFile,
+        total: leads.length,
+        leads: leads.slice(0, 20) // Return first 20
+      });
+    }
+    
+    res.json({ success: true, files: [], leads: [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Search specific area
+app.get('/api/maps/search', async (req, res) => {
+  try {
+    const { location, query } = req.query;
+    
+    if (!location || !query) {
+      return res.status(400).json({ error: 'location and query required' });
+    }
+    
+    const locationData = mapsScraper.PHILIPPINE_LOCATIONS[location.toLowerCase()];
+    if (!locationData) {
+      return res.status(400).json({ 
+        error: 'Invalid location',
+        available: Object.keys(mapsScraper.PHILIPPINE_LOCATIONS)
+      });
+    }
+    
+    const results = await mapsScraper.searchGooglePlaces(query, locationData);
+    
+    res.json({
+      success: true,
+      location,
+      query,
+      total: results.length,
+      results: results.slice(0, 20)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Regional sheets integration
+let mapsLeadsIntegration;
+try {
+  mapsLeadsIntegration = require('./maps-leads-integration');
+  console.log('[Server] Maps leads regional integration loaded');
+} catch (err) {
+  console.log('[Server] Maps leads regional integration not available:', err.message);
+}
+
+// Set regional spreadsheet ID
+app.post('/api/maps/regional/config', (req, res) => {
+  try {
+    const { spreadsheetId } = req.body;
+    
+    if (!spreadsheetId) {
+      return res.status(400).json({ error: 'spreadsheetId required' });
+    }
+    
+    if (!mapsLeadsIntegration) {
+      return res.status(500).json({ error: 'Regional integration not available' });
+    }
+    
+    mapsLeadsIntegration.setSpreadsheetId(spreadsheetId);
+    
+    res.json({
+      success: true,
+      message: 'Regional spreadsheet configured',
+      spreadsheetId
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Scrape and save to regional sheets
+app.post('/api/maps/regional/scrape', async (req, res) => {
+  try {
+    const { locations, businessTypes, limit } = req.body;
+    
+    if (!mapsLeadsIntegration) {
+      return res.status(500).json({ error: 'Regional integration not available' });
+    }
+    
+    console.log('[Maps Regional] Starting scrape:', { locations, businessTypes });
+    
+    const result = await mapsScraper.scrapeLeads({
+      locations: locations || ['batangas'],
+      businessTypes: businessTypes || mapsScraper.TARGET_BUSINESS_TYPES.slice(0, 3),
+      saveToFile: true,
+      syncToSheets: true
+    });
+    
+    res.json({
+      success: true,
+      total: result.total,
+      locations: result.locations,
+      sheetResult: result.sheetResult,
+      sample: result.leads.slice(0, 5),
+      message: `Found ${result.total} potential leads`
+    });
+  } catch (err) {
+    console.error('[Maps Regional] Scrape error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// FRANCHISE LEADS SCRAPER - For bigger businesses (not sari-sari stores)
+// ============================================================================
+
+// Scrape franchise-qualified leads (bigger businesses)
+app.post('/api/maps/franchise/scrape', async (req, res) => {
+  try {
+    const { 
+      locations = ['batangas_city', 'lipa', 'tanauan', 'san_pascual'],
+      targetPerBarangay = 2,
+      syncToSheets = true
+    } = req.body;
+    
+    if (!mapsLeadsIntegration) {
+      return res.status(500).json({ error: 'Regional integration not available' });
+    }
+    
+    console.log('[Maps Franchise] 🏢 Starting FRANCHISE lead scrape');
+    console.log('[Maps Franchise] Locations:', locations);
+    console.log('[Maps Franchise] Target per location:', targetPerBarangay);
+    
+    const result = await mapsScraper.scrapeFranchiseLeads({
+      locations,
+      targetPerBarangay,
+      saveToFile: true,
+      syncToSheets
+    });
+    
+    res.json({
+      success: true,
+      total: result.total,
+      summary: result.summary,
+      sheetResult: result.sheetResult,
+      sample: result.leads.slice(0, 10),
+      message: `Found ${result.total} franchise-qualified leads (Premium: ${result.summary.premium}, Standard: ${result.summary.standard})`
+    });
+  } catch (err) {
+    console.error('[Maps Franchise] Scrape error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get franchise business types
+app.get('/api/maps/franchise/types', (req, res) => {
+  res.json({
+    success: true,
+    franchiseTypes: mapsScraper.FRANCHISE_BUSINESS_TYPES,
+    qualifiers: mapsScraper.FRANCHISE_QUALIFIERS,
+    description: 'Business types suitable for PlataPay franchise package (higher investment capacity)',
+    note: 'These are bigger, established businesses - NOT sari-sari stores'
+  });
+});
+
+// List available locations
+app.get('/api/maps/franchise/locations', (req, res) => {
+  const locations = mapsScraper.PHILIPPINE_LOCATIONS;
+  const grouped = {};
+  
+  for (const [key, loc] of Object.entries(locations)) {
+    const region = loc.region || 'Other';
+    if (!grouped[region]) grouped[region] = [];
+    grouped[region].push({
+      key,
+      name: loc.name,
+      province: loc.province || null,
+      coords: { lat: loc.lat, lng: loc.lng }
+    });
+  }
+  
+  res.json({
+    success: true,
+    totalLocations: Object.keys(locations).length,
+    byRegion: grouped
+  });
+});
+
+// Check franchise qualification for a specific lead
+app.post('/api/maps/franchise/qualify', (req, res) => {
+  try {
+    const lead = req.body;
+    
+    if (!lead.name) {
+      return res.status(400).json({ error: 'Lead name is required' });
+    }
+    
+    const result = mapsScraper.qualifiesForFranchise(lead);
+    
+    res.json({
+      success: true,
+      lead: lead.name,
+      ...result
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get regional summary
+app.get('/api/maps/regional/summary', async (req, res) => {
+  try {
+    if (!mapsLeadsIntegration) {
+      return res.status(500).json({ error: 'Regional integration not available' });
+    }
+    
+    const summary = await mapsLeadsIntegration.getSummary();
+    
+    res.json({
+      success: true,
+      summary,
+      totalRegions: summary.length,
+      totalLeads: summary.reduce((sum, r) => sum + (r.totalLeads || 0), 0)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get leads by region
+app.get('/api/maps/regional/:region', async (req, res) => {
+  try {
+    if (!mapsLeadsIntegration) {
+      return res.status(500).json({ error: 'Regional integration not available' });
+    }
+    
+    const { region } = req.params;
+    const { limit = 100 } = req.query;
+    
+    const leads = await mapsLeadsIntegration.getLeadsByRegion(region, parseInt(limit));
+    
+    res.json({
+      success: true,
+      region,
+      total: leads.length,
+      leads
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update lead status
+app.post('/api/maps/regional/:region/update', async (req, res) => {
+  try {
+    if (!mapsLeadsIntegration) {
+      return res.status(500).json({ error: 'Regional integration not available' });
+    }
+    
+    const { region } = req.params;
+    const { leadId, status, notes } = req.body;
+    
+    if (!leadId || !status) {
+      return res.status(400).json({ error: 'leadId and status required' });
+    }
+    
+    const result = await mapsLeadsIntegration.updateLeadStatus(region, leadId, status, notes);
+    
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add manual lead
+app.post('/api/maps/regional/:region/add', async (req, res) => {
+  try {
+    if (!mapsLeadsIntegration) {
+      return res.status(500).json({ error: 'Regional integration not available' });
+    }
+    
+    const { region } = req.params;
+    const lead = { ...req.body, region };
+    
+    const result = await mapsLeadsIntegration.addLead(lead);
+    
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get qualified leads (with email addresses) - ready for email campaigns
+app.get('/api/maps/regional/qualified', async (req, res) => {
+  try {
+    if (!mapsLeadsIntegration) {
+      return res.status(500).json({ error: 'Regional integration not available' });
+    }
+    
+    const regions = [
+      'NCR', 'Region I', 'Region II', 'Region III', 'Region IV-A', 'Region IV-B',
+      'Region V', 'Region VI', 'Region VII', 'Region VIII', 'Region IX', 'Region X',
+      'Region XI', 'Region XII', 'Region XIII', 'CAR', 'BARMM'
+    ];
+    
+    const qualifiedLeads = [];
+    
+    for (const region of regions) {
+      try {
+        const leads = await mapsLeadsIntegration.getLeadsByRegion(region, 500);
+        const withEmail = leads.filter(lead => lead.Email && lead.Email.trim() !== '');
+        qualifiedLeads.push(...withEmail.map(lead => ({ ...lead, region })));
+      } catch (err) {
+        // Skip regions with errors
+      }
+    }
+    
+    res.json({
+      success: true,
+      total: qualifiedLeads.length,
+      message: `Found ${qualifiedLeads.length} qualified leads with email addresses`,
+      leads: qualifiedLeads
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get leads needing email collection (phone only)
+app.get('/api/maps/regional/needs-email', async (req, res) => {
+  try {
+    if (!mapsLeadsIntegration) {
+      return res.status(500).json({ error: 'Regional integration not available' });
+    }
+    
+    const { region } = req.query;
+    const { limit = 50 } = req.query;
+    
+    if (!region) {
+      return res.status(400).json({ error: 'region query param required' });
+    }
+    
+    const leads = await mapsLeadsIntegration.getLeadsByRegion(region, parseInt(limit));
+    const needsEmail = leads.filter(lead => 
+      (!lead.Email || lead.Email.trim() === '') && 
+      lead.Phone && lead.Phone.trim() !== ''
+    );
+    
+    res.json({
+      success: true,
+      region,
+      total: needsEmail.length,
+      message: `Found ${needsEmail.length} leads with phone but no email`,
+      leads: needsEmail
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Clear all leads from regional sheets (reset)
+app.post('/api/maps/regional/clear', async (req, res) => {
+  try {
+    if (!mapsLeadsIntegration) {
+      return res.status(500).json({ error: 'Regional integration not available' });
+    }
+    
+    console.log('[Maps Regional] 🗑️ Clearing all leads from regional sheets...');
+    
+    const result = await mapsLeadsIntegration.clearAllLeads();
+    
+    res.json({
+      success: true,
+      message: 'All regional sheets cleared',
+      ...result
+    });
+  } catch (err) {
+    console.error('[Maps Regional] Clear error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get available regions and city mappings
+app.get('/api/maps/regional/regions', (req, res) => {
+  if (!mapsLeadsIntegration) {
+    return res.status(500).json({ error: 'Regional integration not available' });
+  }
+  
+  const regions = [
+    'NCR', 'Region I', 'Region II', 'Region III', 'Region IV-A', 'Region IV-B',
+    'Region V', 'Region VI', 'Region VII', 'Region VIII', 'Region IX', 'Region X',
+    'Region XI', 'Region XII', 'Region XIII', 'CAR', 'BARMM'
+  ];
+  
+  res.json({
+    success: true,
+    regions,
+    cityMappings: mapsLeadsIntegration.CITY_TO_REGION
+  });
+});
+
+console.log('[Server] Google Maps leads scraper loaded');
+console.log('[Server] Google Sheets integration loaded — Sheet:', GOOGLE_SHEETS_ID);

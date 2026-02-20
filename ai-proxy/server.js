@@ -20,12 +20,11 @@ app.use((req, res, next) => {
   next();
 });
 
+const CREDENTIALS_PATH = '/root/.claude/.credentials.json';
+const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages?beta=true';
+const REFRESH_URL = 'https://console.anthropic.com/v1/oauth/token';
 const PORT = 3456;
 const API_SECRET = 'innovatehub-ai-2026';
-
-// Use OpenRouter API (more reliable, already configured)
-const OPENROUTER_API_KEY = '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';
-const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions';
 
 // ─── Chat System Prompt ───
 const CHAT_SYSTEM_PROMPT = `You are the InnovateHub Business Hub AI Assistant, powered by Claude. You help users manage their Facebook Business integration, PlataPay fintech services, and Silvera e-commerce platform.
@@ -65,9 +64,7 @@ InnovateHub Inc. is a dynamic software and IT solutions provider based in Batang
 - Creator and developer of the PlataPay digital payment platform
 - Expanding internationally — PlataPay Information Technology LLC is registered in Dubai for cross-border remittance services
 
-Office Address: InnovateHub Commercial Bldg. Unit 13, San Antonio, San Pascual, 4204 Batangas
-Google Maps: https://maps.app.goo.gl/PErGsbGkAiPVViPS6
-Plus Code: Q2QC+935
+Office Address: InnovateHub Commercial Bldg. Unit 13, San Antonio, San Pascual, Batangas City 4204, Philippines
 Operating Hours: Monday to Sunday, 9:00 AM to 6:00 PM
 Phone: +639176851216
 Email: marketing@innovatehub.ph
@@ -230,91 +227,19 @@ PlataPay has 80,000+ agents successfully operating across the Philippines, with 
 - Phone/Viber: +639176851216
 - Landline: 043-772-0017
 - Email: marketing@innovatehub.ph
-- Address: InnovateHub Commercial Building, San Antonio, San Pascual, 4204 Batangas
-- Google Maps: https://maps.app.goo.gl/PErGsbGkAiPVViPS6
-- Plus Code: Q2QC+935
-
-IMPORTANT FOR DIRECTIONS:
-When someone asks for directions, ALWAYS give them the Google Maps link!
-Say: "Ito po exact location namin: https://maps.app.goo.gl/PErGsbGkAiPVViPS6"
-DO NOT make up landmarks or directions - just give the Google Maps link.
-The Plus Code Q2QC+935 can also be used in Google Maps/Waze.
+- Address: InnovateHub Commercial Building, National Highway, San Antonio, San Pascual, Batangas City 4204, Philippines
 - Website: https://platapay.ph
 - Facebook: https://facebook.com/PlataPay
 - Operating Hours: Monday-Sunday, 9:00 AM to 6:00 PM
 
-## BOOKING ORIENTATIONS
-When someone wants to schedule an orientation or meeting:
-1. Get their preferred DATE (Mon-Sat only)
-2. Offer TIME SLOTS: 10AM, 2PM, 5PM, or 8PM
-3. Confirm their EMAIL for the booking confirmation
-4. Tell them: "Booked! Check your email for confirmation code."
-
-Example booking conversation:
-User: "Gusto ko mag-schedule ng orientation"
-Bot: "Nice! Anong araw okay sa'yo?"|||"Available tayo Mon-Sat. 😊"
-User: "Saturday"
-Bot: "This Saturday ba or next week?"|||"Time slots: 10AM, 2PM, 5PM, 8PM"
-User: "This Saturday 2PM"
-Bot: "Perfect! Para ma-confirm..."|||"Ano po email mo for the booking?"
-User: "marc@email.com"
-Bot: "Booked ka na! 🎉"|||"Check email mo for booking reference."|||"See you Saturday 2PM!"
-
-CANCELLING/RESCHEDULING with Booking Reference:
-When someone gives a booking reference (format: PP + 6 letters/numbers like PPRHS97C):
-User: "Cancel ko booking ko. PPRHS97C"
-Bot: "Noted po!"|||"I'll cancel booking PPRHS97C."|||"Gusto mo mag-reschedule?"
-
-User: "Reschedule ko yung PPRHS97C"
-Bot: "Sure! Anong bagong date/time?"|||"Available: Mon-Sat, 10AM/2PM/5PM/8PM"
-
-## 🎯 LEAD CAPTURE (YOUR PRIMARY GOAL!)
-Your #1 job is to CAPTURE LEADS. Every conversation should work toward getting:
-1. Their REAL NAME (confirm the Facebook name - some people use nicknames!)
-2. Their LOCATION (ask: "Saan po area niyo?")
-3. Their EMAIL or PHONE NUMBER (ask: "Para ma-send ko po yung info, ano po email or number niyo?")
-
-IMPORTANT - NAME CONFIRMATION:
-- When context says "The user's name is [Name]", this is from their Facebook profile
-- ALWAYS confirm it early in the conversation: "Hi! Ikaw po ba si [Name], or may ibang gusto mong itawag sa'yo?"
-- Or: "By the way, [Name] po ba talaga pangalan mo or nickname lang yan sa FB?"
-- If they give a different name, use that instead!
-
-LEAD CAPTURE FLOW:
-- FIRST MESSAGE: Greet and confirm name
-- SECOND: Ask about their interest + location
-- THIRD: If interested, ask for email/phone
-- Don't ask all at once — spread it out naturally
-
-TRIGGER PHRASES TO CAPTURE:
-- If they ask about packages → After explaining, ask: "Para ma-send ko po yung full details, ano po email niyo?"
-- If they say "interested" → "Nice! Saan po area niyo para ma-check namin kung may available slot?"
-- If they ask "how to apply" → "Para ma-process po, need ko lang ng contact info niyo - email or phone number po?"
-
-WHEN YOU GET THEIR INFO, CONFIRM IT:
-"Salamat [Name]! Noted po: [email/number] sa [location]. Our team will contact you soon! 🙌"
-
-## RESPONSE FORMAT RULES (SUPER CRITICAL!)
-RULE 1: MAX 80 CHARACTERS per bubble (count them!)
-RULE 2: Use ||| between EVERY sentence (never use newlines!)
-RULE 3: Max 4 bubbles total
-RULE 4: No bullets, no lists, no line breaks
-
-CORRECT:
-Hi! 👋|||Marc po ba pangalan mo?|||Saan ka sa area?
-
-CORRECT (packages):
-2 packages namin:|||Lite - ₱449k (3yrs)|||All-in-One - ₱799k (lifetime)|||Alin trip mo?
-
-CORRECT (asking email):
-Nice!|||Para ma-send ko info...|||Ano email mo? 📧
-
-WRONG (has newline instead of |||):
-"Hi Marc!
-Interested ka sa franchise?"
-
-WRONG (too long):
-"Hi Marc! Welcome po sa PlataPay, we have 2 franchise packages available for you..."
+## RESPONSE FORMAT RULES (CRITICAL — follow strictly)
+- Respond with ONLY the message text to send. No JSON, no markdown formatting, no code blocks.
+- If you need to send multiple messages (for longer info), separate them with |||
+  Example: "First message here|||Second message here|||Third message here"
+- Keep EACH individual message under 640 characters (Facebook Messenger limit).
+- Maximum 3 messages per response (3 segments separated by |||)
+- Use line breaks within a message for readability, but keep it concise.
+- Do NOT use markdown bold (**text**) or headers (##). Use plain text, CAPS for emphasis if needed, or emojis.
 
 ## ESCALATION TO HUMAN SUPPORT
 Escalate to a human agent (give them the contact number +639176851216) when:
@@ -445,29 +370,55 @@ If creating a Back4App schema, include: "schema": { "className": "X", "fields": 
 The route and navItem fields are optional — only include them for new pages.`;
 }
 
-// ─── OpenRouter API Call ───
+// ─── Token Management ───
+function loadCredentials() {
+  const raw = readFileSync(CREDENTIALS_PATH, 'utf-8');
+  return JSON.parse(raw).claudeAiOauth;
+}
+
+async function refreshToken(creds) {
+  console.log('[AI Proxy] Refreshing OAuth token...');
+  const res = await fetch(REFRESH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: creds.refreshToken }),
+  });
+  if (!res.ok) throw new Error('Token refresh failed: ' + await res.text());
+  const data = await res.json();
+  const fullCreds = JSON.parse(readFileSync(CREDENTIALS_PATH, 'utf-8'));
+  fullCreds.claudeAiOauth.accessToken = data.access_token;
+  fullCreds.claudeAiOauth.refreshToken = data.refresh_token || creds.refreshToken;
+  fullCreds.claudeAiOauth.expiresAt = Date.now() + (data.expires_in * 1000);
+  writeFileSync(CREDENTIALS_PATH, JSON.stringify(fullCreds));
+  return fullCreds.claudeAiOauth;
+}
+
+async function getValidToken() {
+  let creds = loadCredentials();
+  if (creds.expiresAt < Date.now() + 300000) creds = await refreshToken(creds);
+  return creds.accessToken;
+}
+
 async function callClaude(systemPrompt, messages, maxTokens = 4096) {
-  const response = await fetch(OPENROUTER_API, {
+  const token = await getValidToken();
+  const response = await fetch(ANTHROPIC_API, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'HTTP-Referer': 'https://innovatehub.ph',
-      'X-Title': 'InnovateHub AI Proxy',
+      'Authorization': `Bearer ${token}`,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'oauth-2025-04-20',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-3.5-sonnet',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: maxTokens,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages
-      ],
+      system: systemPrompt,
+      messages,
     }),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error?.message || JSON.stringify(data.error) || 'AI request failed');
-  // OpenRouter uses OpenAI format
-  return data.choices?.[0]?.message?.content || data.content?.[0]?.text || '';
+  if (!response.ok) throw new Error(data.error?.message || 'AI request failed');
+  return data.content?.[0]?.text || '';
 }
 
 // ─── Auth Middleware ───

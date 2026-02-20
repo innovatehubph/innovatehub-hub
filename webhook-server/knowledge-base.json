@@ -1,0 +1,45 @@
+{
+  "lastUpdated": "2026-02-20T10:00:04.888Z",
+  "website": {
+    "fetchedAt": "2026-02-20T10:00:04.003Z",
+    "title": "",
+    "description": "Experience seamless digital payments and smart financial solutions with PlataPay",
+    "services": [],
+    "packages": [],
+    "contact": {},
+    "stats": {}
+  },
+  "facebook": {},
+  "agents": {
+    "fetchedAt": "2026-02-17T09:54:14.364Z",
+    "totalActive": 94,
+    "totalRows": 94,
+    "byLocation": {
+      "batangas": 28,
+      "quezon": 3,
+      "laguna": 2,
+      "cebu": 3,
+      "bulacan": 4,
+      "pampanga": 1,
+      "manila": 4,
+      "davao": 3,
+      "iloilo": 1
+    },
+    "topLocations": [
+      "batangas: 28",
+      "bulacan: 4",
+      "manila: 4",
+      "quezon: 3",
+      "cebu: 3"
+    ]
+  },
+  "packages": {},
+  "updates": [
+    {
+      "source": "sheets",
+      "timestamp": "2026-02-17T09:54:14.364Z",
+      "type": "agent_count_change",
+      "summary": "Agent count: 0 → 94"
+    }
+  ]
+}
